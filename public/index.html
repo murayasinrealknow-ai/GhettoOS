@@ -1,0 +1,2884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GhettoOS</title>
+  <link rel="icon" id="favicon" href="data:,">
+  <script src="/winbox/winbox.bundle.min.js"></script>
+  <style>
+    /* ===================== GhettoOS — dark "liquid glass" theme =====================
+       Glass = translucent fill + one backdrop blur (14px) + a 1px inner highlight.
+       Blur is only used on the menu bar, dock, windows and lock card, never stacked
+       on big animated layers, so it stays smooth on Chromebooks. */
+    :root {
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --ink: #ecebf2;
+      --muted: #9b9aa8;
+      --line: rgba(255, 255, 255, .10);
+      --hi: rgba(255, 255, 255, .14);
+      --glass: rgba(20, 20, 28, .72);
+      --glass-bar: rgba(16, 16, 24, .55);
+      --blur: blur(14px) saturate(150%);
+      --accent: #e0b866;            /* antique gold, from the clock logo and the engraving */
+      --accent-soft: rgba(224, 184, 102, .22);
+      --menu-h: 30px;
+      --dock-icon: 52px;
+      --wall: radial-gradient(ellipse 60% 50% at 18% 22%, rgba(92, 64, 170, .55), transparent 70%),
+              radial-gradient(ellipse 50% 45% at 82% 28%, rgba(28, 92, 168, .45), transparent 70%),
+              radial-gradient(ellipse 70% 50% at 62% 88%, rgba(176, 116, 48, .30), transparent 70%),
+              radial-gradient(ellipse 40% 32% at 36% 70%, rgba(128, 40, 116, .35), transparent 70%),
+              #07070d;
+      color-scheme: dark;
+    }
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body { font: 13px/1.4 var(--font); color: var(--ink); background: var(--wall); -webkit-font-smoothing: antialiased; }
+    body.compact { --dock-icon: 40px; }
+    button, input, select, textarea { font-family: var(--font); }
+    svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      :root { --glass: rgba(22, 22, 30, .96); --glass-bar: rgba(18, 18, 26, .95); }
+    }
+
+    /* ---- Wallpaper layers ---- */
+    #bg { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
+    #bg.dust::before { content: ""; position: absolute; inset: 0; opacity: .55; background-size: 340px 340px;
+      background-image: radial-gradient(1px 1px at 30px 40px, #fff, transparent), radial-gradient(1px 1px at 140px 90px, #d9d2ff, transparent), radial-gradient(1.4px 1.4px at 230px 170px, #fff, transparent), radial-gradient(1px 1px at 80px 250px, #ffe7c2, transparent), radial-gradient(1px 1px at 300px 300px, #fff, transparent); }
+    #accent { position: fixed; right: 3vw; top: 50%; width: min(42vw, 540px); transform: translateY(-52%); opacity: .085; pointer-events: none; z-index: -1; user-select: none; }
+    .bg-aurora { background: linear-gradient(120deg, #120f2e, #3b2f8f, #0d4f6b, #5b2380, #8a1f55, #120f2e); background-size: 400% 400%; animation: bg-shift 30s ease-in-out infinite; }
+    @keyframes bg-shift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    .bg-stars { background: #04050c; }
+    .bg-stars::before, .bg-stars::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: -300px; background-size: 300px 300px; animation: star-fall 40s linear infinite;
+      background-image: radial-gradient(1.6px 1.6px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 120px 80px, #cde, transparent), radial-gradient(1.4px 1.4px at 210px 150px, #fff, transparent), radial-gradient(1px 1px at 60px 210px, #fff, transparent), radial-gradient(1.2px 1.2px at 260px 260px, #ddf, transparent); }
+    .bg-stars::after { top: -470px; background-size: 470px 470px; opacity: .55; animation-name: star-fall-far; animation-duration: 90s; }
+    @keyframes star-fall { to { transform: translateY(300px); } }
+    @keyframes star-fall-far { to { transform: translateY(470px); } }
+    .bg-lava { background: #0a0b14; }
+    .bg-lava::before, .bg-lava::after { content: ""; position: absolute; width: 75vmax; height: 75vmax; border-radius: 50%; }
+    .bg-lava::before { left: -20vmax; top: -20vmax; background: radial-gradient(circle, rgba(170, 70, 200, .5), transparent 62%); animation: drift-a 26s ease-in-out infinite alternate; }
+    .bg-lava::after { right: -25vmax; bottom: -25vmax; background: radial-gradient(circle, rgba(224, 160, 70, .4), transparent 62%); animation: drift-b 32s ease-in-out infinite alternate; }
+    @keyframes drift-a { to { transform: translate(40vw, 30vh) scale(1.2); } }
+    @keyframes drift-b { to { transform: translate(-35vw, -25vh) scale(1.1); } }
+    @media (prefers-reduced-motion: reduce) { #bg, #bg::before, #bg::after { animation: none !important; } }
+
+    /* ---- Menu bar ---- */
+    #menubar { position: fixed; top: 0; left: 0; right: 0; height: var(--menu-h); z-index: 100000; display: flex; align-items: center; gap: 6px; padding: 0 10px;
+      background: var(--glass-bar); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 13px; user-select: none; }
+    .mb-btn { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: default; }
+    .mb-btn:hover, .mb-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .13); }
+    .mb-logo img { width: 20px; height: 20px; border-radius: 50%; display: block; object-fit: cover; background: #0d0c14; }
+    #mb-app { font-weight: 700; padding: 0 6px; }
+    .mb-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    .mb-right span { padding: 0 6px; white-space: nowrap; }
+    #mb-menu { position: fixed; top: calc(var(--menu-h) + 4px); left: 8px; z-index: 100001; min-width: 230px; padding: 5px; border-radius: 10px;
+      background: rgba(28, 28, 38, .78); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: 0 16px 40px rgba(0, 0, 0, .5), inset 0 0 0 1px var(--hi); }
+    #mb-menu[hidden] { display: none; }
+    #mb-menu button { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 5px 10px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: default; }
+    #mb-menu button:hover { background: var(--accent-soft); }
+    #mb-menu kbd { font: inherit; color: var(--muted); }
+    #mb-menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 6px; }
+
+    /* ---- Dock ---- */
+    #dock { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 100000; height: calc(var(--dock-icon) + 14px); box-sizing: border-box;
+      display: flex; align-items: flex-end; gap: 6px; padding: 7px 9px; border-radius: 22px;
+      background: rgba(30, 30, 42, .45); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, .45), inset 0 0 0 1px var(--hi), inset 0 1px 0 rgba(255, 255, 255, .10); }
+    .dock-item { position: relative; flex: none; width: var(--dock-icon); height: var(--dock-icon); padding: 0; border: 0; background: none; cursor: pointer; transition: width .16s ease-out, height .16s ease-out; }
+    #dock.magnify .dock-item { transition-duration: .06s; }
+    .dock-item .tile { position: absolute; inset: 0; border-radius: 23%; overflow: hidden; display: grid; place-items: center; box-shadow: 0 3px 8px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(255, 255, 255, .12); }
+    /* Clear glass tiles: the wallpaper (whatever theme is picked) shows through. */
+    .tile { background: linear-gradient(160deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .04)); }
+    .tile.native { color: #f0dfb6; }
+    .tile.native svg { width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .tile.sphere img { width: 88%; height: 88%; object-fit: contain; }
+    .tile.site img { width: 58%; height: 58%; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
+
+    /* ---- Desktop icons ---- */
+    #desktop { position: fixed; top: calc(var(--menu-h) + 14px); left: 14px; bottom: calc(var(--dock-icon) + 40px); z-index: 0;
+      display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 96px); grid-auto-columns: 88px; gap: 4px; align-content: start; }
+    .desk-item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px 6px; border: 0; border-radius: 10px; background: none; color: #fff; cursor: pointer; font: 500 12px/1.2 var(--font); }
+    .desk-item:hover, .desk-item:focus-visible { background: rgba(255, 255, 255, .10); outline: none; }
+    .desk-item:focus-visible .tile { box-shadow: 0 0 0 2px var(--accent); }
+    .desk-item .tile { position: relative; width: 54px; height: 54px; flex: none; border-radius: 23%; overflow: hidden; display: grid; place-items: center;
+      -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); box-shadow: 0 3px 8px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(255, 255, 255, .14); }
+    .desk-item .tile .letter { font-size: 24px; }
+    .desk-item .label { max-width: 100%; text-align: center; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tile .letter { width: 100%; height: 100%; font-size: calc(var(--dock-icon) * .45); }
+    .dock-item::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(255, 255, 255, .9); opacity: 0; transition: opacity .2s; }
+    .dock-item.running::after { opacity: 1; }
+    .dock-item .tip { position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%); padding: 4px 10px; border-radius: 7px; white-space: nowrap; font-size: 12px; color: var(--ink);
+      background: rgba(28, 28, 38, .85); box-shadow: inset 0 0 0 1px var(--hi); opacity: 0; pointer-events: none; transition: opacity .12s; }
+    .dock-item:hover .tip, .dock-item:focus-visible .tip { opacity: 1; }
+    .dock-item:focus-visible { outline: none; }
+    .dock-item:focus-visible .tile { box-shadow: 0 0 0 2px var(--accent); }
+    .dock-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: rgba(255, 255, 255, .18); }
+    @media (max-width: 720px) { :root { --dock-icon: 38px; } #dock { gap: 4px; padding: 6px; } }
+
+    /* ---- Glass windows (WinBox) ---- */
+    body .winbox { background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border-radius: 12px; color: var(--ink);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px rgba(0, 0, 0, .55); animation: win-in .18s ease-out; }
+    body .winbox::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), inset 0 1px 0 rgba(255, 255, 255, .10); }
+    @keyframes win-in { from { opacity: 0; transform: scale(.97); } }
+    body .winbox.min { display: none; }             /* minimized windows live in the dock */
+    body .winbox .wb-header { height: 38px; line-height: 38px; color: var(--ink); }
+    body .winbox .wb-body { top: 38px; background: transparent; border-radius: 0 0 12px 12px; overflow: hidden !important; }
+    body .winbox .wb-drag { padding-left: 0; }
+    body .winbox .wb-title { font: 600 13px/38px var(--font); text-align: center; padding: 0 84px; color: rgba(236, 235, 242, .92); }
+    body .winbox:not(.focus) .wb-title { color: rgba(236, 235, 242, .5); }
+    body .winbox .wb-icon { display: none !important; }
+    body .winbox .wb-control { position: absolute; left: 14px; top: 0; z-index: 2; float: none; height: 100%; display: flex; align-items: center; gap: 8px; }
+    body .winbox .wb-control span { position: relative; flex: none; width: 12px; height: 12px; border-radius: 50%; background-image: none; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .25); }
+    body .winbox .wb-close { order: 0; background-color: #ff5f57; }
+    body .winbox .wb-min { order: 1; background-color: #febc2e; }
+    body .winbox .wb-max { order: 2; background-color: #28c840; }
+    body .winbox .wb-full { display: none; }
+    body .winbox:not(.focus) .wb-control span { background-color: rgba(255, 255, 255, .2); }
+    body .winbox .wb-control:hover span.wb-close { background-color: #ff5f57; }
+    body .winbox .wb-control:hover span.wb-min { background-color: #febc2e; }
+    body .winbox .wb-control:hover span.wb-max { background-color: #28c840; }
+    body .winbox .wb-control span::before { position: absolute; inset: 0; font: 700 10px/12px var(--font); text-align: center; color: rgba(0, 0, 0, .6); opacity: 0; }
+    body .winbox .wb-control:hover span::before { opacity: 1; }
+    body .winbox .wb-close::before { content: "\00d7"; }
+    body .winbox .wb-min::before { content: "\2212"; }
+    body .winbox .wb-max::before { content: "+"; }
+
+    /* ---- App contents ---- */
+    .app { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; background: transparent; color: var(--ink); }
+    .app .bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; flex: none; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+    .app .bar input, .app .bar select { flex: 1; min-width: 0; height: 30px; box-sizing: border-box; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .07); color: var(--ink); font: 13px var(--font); outline: none; }
+    .app .bar select { flex: none; width: auto; padding-right: 8px; }
+    .app .bar option { background: #1c1b26; }
+    .app .bar input:focus { border-color: rgba(224, 184, 102, .6); background: rgba(255, 255, 255, .1); }
+    .app .bar button { flex: none; height: 30px; min-width: 30px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px;
+      background: transparent; color: var(--ink); font: 600 13px var(--font); cursor: pointer; }
+    .app .bar button:hover { background: rgba(255, 255, 255, .1); }
+    .app .bar .go { background: rgba(255, 255, 255, .1); padding: 0 14px; border-radius: 999px; }
+    /* WinBox's stylesheet makes every iframe in a window position:absolute and 100% tall,
+       which put the iframe on top of the address bar. Keep ours in the flex layout. */
+    .winbox .app iframe { position: static; flex: 1; width: 100%; height: auto; min-height: 0; border: 0; background: #fff; }
+    .app .status { padding: 8px 14px 2px; flex: none; color: var(--muted); font-size: 12px; }
+    .site-app .app-title { flex: 1; padding: 0 6px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--muted); }
+
+    /* Games */
+    .grid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; padding: 10px 14px 14px; align-content: start; }
+    .grid button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .07);
+      background: rgba(255, 255, 255, .05); color: var(--ink); font: 12.5px var(--font); cursor: pointer; transition: background .12s, transform .12s; }
+    .grid button:hover { background: rgba(255, 255, 255, .1); transform: translateY(-1px); }
+    .grid button[hidden] { display: none; }
+    .grid img, .letter { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+    .letter { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 44px; font-weight: 700; }
+    .grid span { overflow-wrap: anywhere; text-align: center; line-height: 1.25; }
+    .grid small { color: var(--muted); font-size: 11px; }
+    .picker, .player { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .picker[hidden], .player[hidden] { display: none; }
+    .player .game-title { flex: 1; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; }
+    .player .game-msg { color: var(--muted); font-size: 12px; }
+    .player .bar button { font-size: 15px; }
+
+    /* ---- Cover when unfocused ---- */
+    #cover { position: fixed; inset: 0; z-index: 2147483000; background: #fff; display: flex; }
+    #cover[hidden] { display: none; }
+    #cover iframe { flex: 1; width: 100%; height: 100%; border: 0; }
+
+    /* ---- Lock screen ---- */
+    #lock { position: fixed; inset: 0; z-index: 2147482500; isolation: isolate; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      padding: 8vh 16px 4vh; box-sizing: border-box; color: #fff; background: var(--wall); transition: opacity .45s ease, transform .45s ease; }
+    #lock[hidden] { display: none; }
+    #lock.unlocking { opacity: 0; transform: scale(1.04); pointer-events: none; }
+    #lock video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
+    #lock::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, .45)), linear-gradient(transparent 55%, rgba(0, 0, 0, .35)); }
+    .lock-top { text-align: center; text-shadow: 0 2px 20px rgba(0, 0, 0, .45); }
+    .lock-date { font-size: 19px; font-weight: 600; opacity: .9; }
+    .lock-time { font-size: clamp(64px, 12vw, 128px); font-weight: 600; line-height: 1; letter-spacing: -.03em; margin-top: 4px; background: linear-gradient(#fff, rgba(255, 255, 255, .78)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lock-card { width: min(340px, 100%); box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 11px; padding: 26px 24px 20px; border-radius: 28px;
+      background: rgba(20, 20, 28, .42); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 255, 255, .14), inset 0 1px 0 rgba(255, 255, 255, .14); }
+    .lock-logo { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background: radial-gradient(circle at 50% 40%, #2a2440, #0d0c16 75%);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .2), 0 12px 30px rgba(0, 0, 0, .55), 0 0 46px rgba(224, 184, 102, .22); }
+    .lock-name { font-size: 22px; font-weight: 600; letter-spacing: .01em; margin-bottom: 4px; }
+    .pill-wrap { position: relative; width: 100%; }
+    .pill { width: 100%; height: 40px; box-sizing: border-box; padding: 0 44px 0 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16);
+      background: rgba(255, 255, 255, .10); color: #fff; font: 14px var(--font); outline: none; transition: border-color .15s, background .15s; }
+    .pill::placeholder { color: rgba(255, 255, 255, .55); }
+    .pill:focus { border-color: rgba(224, 184, 102, .75); background: rgba(255, 255, 255, .14); }
+    .pill-go { position: absolute; right: 5px; top: 5px; width: 30px; height: 30px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer;
+      background: rgba(255, 255, 255, .18); color: #fff; transition: background .15s; }
+    .pill-go:hover { background: var(--accent); color: #1a1408; }
+    /* Show / hide password eye */
+    .pass-eye { position: absolute; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center;
+      background: none; color: rgba(255, 255, 255, .6); cursor: pointer; }
+    .pass-eye:hover, .pass-eye[aria-pressed="true"] { color: #fff; background: rgba(255, 255, 255, .1); }
+    .pass-eye svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .pill-wrap .pass-eye { right: 40px; }
+    #lock-pass { padding-right: 74px; }
+    .eye-wrap { position: relative; width: 100%; }
+    .eye-wrap .pass-eye { right: 5px; }
+    .eye-wrap input { padding-right: 40px !important; }
+    .lock-msg { min-height: 16px; font-size: 12.5px; color: rgba(255, 255, 255, .62); text-align: center; }
+    .lock-msg.err { color: #ff9b95; }
+    .lock-links { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgba(255, 255, 255, .4); }
+    .lock-links button { border: 0; background: none; padding: 2px 4px; border-radius: 6px; color: rgba(255, 255, 255, .72); font: inherit; cursor: pointer; }
+    .lock-links button:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+    .lock-card.busy, .auth-box.busy { opacity: .7; pointer-events: none; }
+    .lock-foot { min-height: 28px; display: flex; align-items: center; justify-content: center; text-align: center; }
+    .tagline { font-size: 15px; font-style: italic; letter-spacing: .02em; color: rgba(240, 223, 182, .78); text-shadow: 0 2px 12px rgba(0, 0, 0, .6); transition: opacity .5s ease, transform .5s ease; }
+    .tagline.out { opacity: 0; transform: translateY(6px); }
+
+    /* ---- Chat app ---- */
+    .chat-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid rgba(255, 255, 255, .06); flex: none; }
+    .chat-top b { font-size: 14px; }
+    .chat-top.ai-key[hidden] { display: none; }
+    .chat-top .online { margin-left: auto; color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+    .chat-top .online::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
+    .chat-log { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+    .chat-msg { display: flex; gap: 10px; padding: 4px 6px; border-radius: 8px; }
+    .chat-msg:hover { background: rgba(255, 255, 255, .03); }
+    .chat-msg.cont { padding-top: 0; }
+    .chat-msg.cont .avatar { visibility: hidden; height: 0; }
+    .chat-msg .avatar { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; }
+    .chat-msg .body { min-width: 0; flex: 1; }
+    .chat-msg .who { display: flex; align-items: baseline; gap: 8px; }
+    .chat-msg .who b { font-size: 13px; }
+    .chat-msg .who time { font-size: 11px; color: var(--muted); }
+    .chat-msg .text { white-space: pre-wrap; overflow-wrap: anywhere; color: #dcdbe4; }
+    .chat-msg.mine .who b { color: var(--accent); }
+    .chat-empty { margin: auto; color: var(--muted); text-align: center; }
+    .chat-send { display: flex; gap: 8px; padding: 10px 14px 12px; flex: none; border-top: 1px solid rgba(255, 255, 255, .06); }
+    .chat-send input { flex: 1; min-width: 0; height: 36px; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: var(--ink); font: 13.5px var(--font); outline: none; }
+    .chat-send input:focus { border-color: rgba(224, 184, 102, .6); }
+    .chat-send button, .auth-box .primary { height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: #1a1408; font: 600 13px var(--font); cursor: pointer; }
+    .chat-send button:disabled { opacity: .5; cursor: default; }
+    .chat-note { padding: 0 16px 8px; font-size: 12px; color: #ff9b95; flex: none; }
+    .chat-note:empty { display: none; }
+    .chat-msg { position: relative; }
+    .chat-msg.blocked { display: none; }
+    .chat-msg.flash { background: var(--accent-soft); }
+    .chat-msg .acts { position: absolute; right: 6px; top: -12px; z-index: 1; display: none; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(32, 32, 44, .96); box-shadow: inset 0 0 0 1px var(--hi), 0 4px 12px rgba(0, 0, 0, .4); }
+    .chat-msg:hover .acts, .chat-msg.menu-open .acts { display: flex; }
+    .chat-msg .acts button { width: 28px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; font-size: 14px; display: grid; place-items: center; }
+    .chat-msg .acts button:hover { background: rgba(255, 255, 255, .12); }
+    .chat-msg .quote { display: block; max-width: 100%; margin: 2px 0; padding: 0 0 0 8px; border: 0; border-left: 2px solid rgba(224, 184, 102, .55); background: none; color: var(--muted); font: 12px var(--font); text-align: left; cursor: pointer;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .chat-msg .quote b { color: #cfcbe0; font-weight: 600; }
+    .reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .reacts:empty { display: none; }
+    .reacts button { height: 24px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .06); color: var(--ink); font: 12px var(--font); cursor: pointer; }
+    .reacts button.on { border-color: rgba(224, 184, 102, .7); background: var(--accent-soft); }
+    .chat-reply { display: flex; align-items: center; gap: 8px; padding: 7px 16px 0; font-size: 12px; color: var(--muted); flex: none; }
+    .chat-reply[hidden] { display: none; }
+    .chat-reply span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .chat-reply b { color: var(--accent); }
+    .chat-reply button { border: 0; background: none; color: var(--ink); cursor: pointer; font-size: 14px; }
+    .chat-send button.emoji-btn { width: 36px; flex: none; padding: 0; background: rgba(255, 255, 255, .08); font-size: 17px; }
+    .av { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; }
+    .av.sm { width: 24px; height: 24px; font-size: 11px; }
+
+    /* ---- Pop-up menus (right-click / ⋯) and emoji picker ---- */
+    .ctx-menu { position: fixed; z-index: 200000; min-width: 190px; padding: 5px; border-radius: 10px; font-size: 13px;
+      background: rgba(28, 28, 38, .92); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: 0 16px 40px rgba(0, 0, 0, .5), inset 0 0 0 1px var(--hi); }
+    .ctx-menu .item { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 10px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+    .ctx-menu .item:hover:not(:disabled) { background: var(--accent-soft); }
+    .ctx-menu .item:disabled { color: var(--muted); cursor: default; }
+    .ctx-menu .item.danger { color: #ff9b95; }
+    .ctx-menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 6px; }
+    .ctx-menu .emojis { display: flex; flex-wrap: wrap; gap: 2px; }
+    .ctx-menu .emojis.grid { display: grid; grid-template-columns: repeat(8, 34px); }
+    .ctx-menu .emojis button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; font-size: 19px; cursor: pointer; }
+    .ctx-menu .emojis button:hover { background: rgba(255, 255, 255, .12); }
+
+    .toast { position: fixed; left: 50%; bottom: calc(var(--dock-icon) + 36px); transform: translateX(-50%); z-index: 200001; max-width: min(420px, 90vw); padding: 9px 16px; border-radius: 12px; font-size: 13px;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none;
+      background: rgba(28, 28, 38, .92); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: 0 10px 30px rgba(0, 0, 0, .45), inset 0 0 0 1px var(--hi); }
+
+    /* ---- Shared small controls ---- */
+    .gbtn { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: var(--ink); font: 600 12.5px var(--font); cursor: pointer; white-space: nowrap; }
+    .gbtn:hover:not(:disabled) { background: rgba(255, 255, 255, .13); }
+    .gbtn.primary { background: var(--accent); color: #1a1408; border-color: transparent; }
+    .gbtn.primary:hover:not(:disabled) { background: #ebc77c; }
+    .gbtn.danger { color: #ff9b95; }
+    .gbtn:disabled { opacity: .5; cursor: default; }
+    .ginput { height: 30px; min-width: 0; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: var(--ink); font: 13px var(--font); outline: none; }
+    .ginput:focus, .suggest textarea:focus { border-color: rgba(224, 184, 102, .6); }
+    .seg { display: flex; gap: 6px; }
+    .seg button { height: 30px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .06); color: var(--ink); font: 600 12.5px var(--font); cursor: pointer; }
+    .seg button.on { background: var(--accent); color: #1a1408; border-color: transparent; }
+    .badge { min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 5px; border-radius: 9px; background: #ff453a; color: #fff; font: 700 11px/18px var(--font); text-align: center; }
+    .desk-item { position: relative; }
+    .desk-item .badge { position: absolute; top: 2px; right: 12px; box-shadow: 0 0 0 2px rgba(0, 0, 0, .35); }
+
+    /* ---- Inbox ---- */
+    .inbox { flex-direction: row; }
+    .inbox-side { width: 220px; flex: none; box-sizing: border-box; overflow-y: auto; padding: 12px 10px; display: flex; flex-direction: column; gap: 3px; border-right: 1px solid rgba(255, 255, 255, .06); }
+    .inbox-side h4 { margin: 12px 6px 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .inbox-side .none { padding: 2px 6px; font-size: 12px; color: var(--muted); }
+    .inbox-add { display: flex; gap: 6px; }
+    .inbox-add .ginput { flex: 1; }
+    .inbox-msg { min-height: 15px; padding: 2px 6px; font-size: 12px; color: var(--muted); }
+    .inbox-msg.err { color: #ff9b95; }
+    .person { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 6px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: 13px var(--font); text-align: left; }
+    button.person { cursor: pointer; }
+    button.person:hover, .person.sel { background: rgba(255, 255, 255, .08); }
+    .person .nm { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .person .mini { flex: none; height: 22px; padding: 0 8px; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .1); color: var(--ink); font: 600 11px var(--font); cursor: pointer; }
+    .person .mini:hover { background: rgba(255, 255, 255, .18); }
+    .person .mini.ok { background: var(--accent); color: #1a1408; }
+    .inbox-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .inbox-empty { margin: auto; padding: 20px; color: var(--muted); text-align: center; font-size: 13px; }
+    @media (max-width: 560px) { .inbox-side { width: 160px; } }
+
+    /* ---- Leaderboard ---- */
+    .lb-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; flex: none; }
+    .lb-head .gbtn { margin-left: auto; }
+    .lb-me { display: flex; gap: 22px; margin: 2px 16px 8px; padding: 10px 14px; border-radius: 12px; background: rgba(255, 255, 255, .06); font-size: 12px; color: var(--muted); flex: none; }
+    .lb-me b { display: block; font-size: 18px; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .lb-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 0 12px 14px; list-style: none; }
+    .lb-list li { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; font-size: 13.5px; }
+    .lb-list li.me { background: var(--accent-soft); }
+    .lb-list .rank { width: 30px; flex: none; text-align: center; font-weight: 700; color: var(--muted); }
+    .lb-list .rank.medal { font-size: 18px; }
+    .lb-list .nm { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .lb-list .val { font-variant-numeric: tabular-nums; color: #f0dfb6; white-space: nowrap; }
+    .lb-list .sub { color: var(--muted); font-size: 11.5px; margin-left: 6px; }
+    .lb-note { padding: 18px; color: var(--muted); text-align: center; font-size: 13px; }
+
+    /* ---- Calculator ---- */
+    .calc { padding: 12px 14px 14px; gap: 8px; user-select: none; outline: none; }
+    .calc-expr { min-height: 18px; padding: 0 6px; text-align: right; font-size: 13px; color: var(--muted); }
+    .calc-display { padding: 0 6px 4px; text-align: right; font-size: 40px; font-weight: 300; font-variant-numeric: tabular-nums; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .calc-keys { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 8px; }
+    .calc-keys button { border: 0; border-radius: 16px; background: rgba(255, 255, 255, .10); color: var(--ink); font: 500 20px var(--font); cursor: pointer; }
+    .calc-keys button:hover { background: rgba(255, 255, 255, .17); }
+    .calc-keys button:active { transform: scale(.96); }
+    .calc-keys .fn { background: rgba(255, 255, 255, .2); }
+    .calc-keys .op { background: var(--accent); color: #1a1408; }
+    .calc-keys .op:hover { background: #ebc77c; }
+    .calc-keys .op.on { background: #fff; }
+    .calc-keys .zero { grid-column: span 2; }
+
+    /* ---- Notepad ---- */
+    .notes { flex-direction: row; }
+    .notes-side { width: 200px; flex: none; display: flex; flex-direction: column; border-right: 1px solid rgba(255, 255, 255, .06); }
+    .notes-side .notes-bar { display: flex; gap: 6px; padding: 10px; }
+    .notes-side .notes-bar .gbtn { flex: 1; }
+    .notes-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+    .note-item { display: block; width: 100%; padding: 7px 9px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+    .note-item:hover { background: rgba(255, 255, 255, .06); }
+    .note-item.sel { background: var(--accent-soft); }
+    .note-item b { display: block; font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .note-item small { font-size: 11px; color: var(--muted); }
+    .notes textarea { flex: 1; min-width: 0; resize: none; border: 0; outline: none; background: transparent; color: var(--ink); font: 14px/1.6 var(--font); padding: 14px 18px; }
+    @media (max-width: 560px) { .notes-side { width: 140px; } }
+
+    /* ---- Changelog ---- */
+    .changelog { display: block; overflow-y: auto; padding: 18px 24px 24px; }
+    .cl-rel { margin-bottom: 26px; }
+    .cl-rel header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+    .cl-rel .ver { font-size: 22px; font-weight: 700; color: var(--accent); }
+    .cl-rel .ttl { font-size: 15px; font-weight: 600; }
+    .cl-rel .date { font-size: 12px; color: var(--muted); }
+    .cl-rel h4 { margin: 14px 0 4px; font-size: 13px; }
+    .cl-rel ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: #d4d2de; }
+
+    /* ---- Suggestions ---- */
+    .suggest { overflow-y: auto; padding: 18px 20px; gap: 10px; }
+    .suggest h2 { margin: 0; font-size: 18px; }
+    .suggest h3 { margin: 14px 0 0; font-size: 14px; }
+    .suggest p { margin: 0; font-size: 13px; color: var(--muted); }
+    .suggest textarea { flex: none; min-height: 140px; resize: vertical; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: var(--ink); font: 14px/1.5 var(--font); outline: none; }
+    .suggest .row { display: flex; align-items: center; gap: 10px; }
+    .suggest .note { font-size: 12.5px; color: var(--muted); }
+    .suggest .note.err { color: #ff9b95; }
+    .sg-item { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: rgba(255, 255, 255, .05); }
+    .sg-item .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .sg-item .meta .gbtn { margin-left: auto; height: 24px; padding: 0 9px; font-size: 11.5px; }
+    .sg-item .txt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; }
+    .auth-box { margin: auto; width: min(320px, 90%); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+    .auth-box .logo-img { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #2a2440, #0d0c16 75%); }
+    .auth-box h2 { margin: 4px 0 0; font-size: 18px; }
+    .auth-box p { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
+    .auth-box input { width: 100%; height: 38px; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: var(--ink); font: 13.5px var(--font); outline: none; }
+    .auth-box input:focus { border-color: rgba(224, 184, 102, .6); }
+    .auth-box .row2 { display: flex; gap: 8px; width: 100%; }
+    .auth-box .row2 button { flex: 1; }
+    .auth-box .secondary { height: 36px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, .07); color: var(--ink); font: 600 13px var(--font); cursor: pointer; }
+    .auth-box .msg { min-height: 16px; font-size: 12.5px; color: #ff9b95; }
+
+    /* ---- Games: favorites ---- */
+    .grid .tile-wrap { position: relative; display: flex; }
+    .grid .tile-wrap[hidden] { display: none; }
+    .grid .tile-wrap > button.game { flex: 1; min-width: 0; }
+    .grid .fav { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 0; display: grid; place-items: center;
+      background: rgba(10, 10, 16, .6); color: rgba(255, 255, 255, .85); font-size: 15px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .12s; transform: none; }
+    .grid .tile-wrap:hover .fav, .grid .fav.on, .grid .fav:focus-visible { opacity: 1; }
+    .grid .fav.on { color: var(--accent); }
+    .grid .fav:hover { background: rgba(10, 10, 16, .85); transform: none; }
+    .player .bar button.on { color: var(--accent); }
+    .game-badge { font-size: 10.5px; color: #8fd19e; }
+
+    /* ---- About window ---- */
+    .about { align-items: center; justify-content: center; gap: 8px; text-align: center; }
+    .about .logo-img { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #2a2440, #0d0c16 75%); box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 40px rgba(224, 184, 102, .2); }
+    .about h2 { margin: 6px 0 0; font-size: 20px; }
+    .about p { margin: 0; color: var(--muted); }
+    .about .sphere { width: 120px; opacity: .55; margin-top: 8px; }
+
+    /* ---- Settings ---- */
+    .settings { font-size: 14px; }
+    .set-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+    .settings section { max-width: 680px; margin: 0 auto 14px; background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .08); border-radius: 12px; overflow: hidden; }
+    .settings h3 { margin: 0; padding: 12px 16px 2px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8d8c99; }
+    .settings .row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; }
+    .settings .row + .row, .settings .chips + .row, .settings .scripts + .row, .settings .scripts:not(:empty) { border-top: 1px solid rgba(255, 255, 255, .06); }
+    .settings .txt { flex: 1; min-width: 0; }
+    .settings .txt b { display: block; font-weight: 600; }
+    .settings .txt small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.45; margin-top: 2px; }
+    .settings .ctl { display: flex; align-items: center; gap: 8px; flex: none; }
+    .settings .field { height: 34px; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, .12); border-radius: 8px; padding: 0 10px; font: inherit;
+      background: rgba(255, 255, 255, .06); color: inherit; width: 230px; max-width: 100%; }
+    .settings .field::placeholder { color: rgba(236, 235, 242, .4); }
+    .settings .field:focus { outline: 2px solid rgba(224, 184, 102, .25); border-color: var(--accent); }
+    .settings option { background: #1c1b26; color: var(--ink); }
+    .settings .field.key { width: 150px; text-align: center; font-weight: 600; }
+    .settings .grow { flex: 1; width: auto; }
+    .settings textarea.field { height: 34px; min-height: 34px; max-height: 200px; padding: 7px 10px; resize: vertical; font: 13px/1.4 ui-monospace, Consolas, monospace; }
+    .settings textarea.field:focus { height: 120px; }
+    .settings .btn { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .08); font: inherit; font-weight: 500; cursor: pointer; color: inherit; white-space: nowrap; }
+    .settings .btn:hover { background: rgba(255, 255, 255, .14); }
+    .settings .btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    .settings .btn.danger { color: #ff8f8a; border-color: rgba(255, 95, 87, .35); background: rgba(255, 95, 87, .10); }
+    .settings .btn.danger:hover { background: rgba(255, 95, 87, .18); }
+    .switch { position: relative; display: inline-block; width: 42px; height: 24px; flex: none; }
+    .switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+    .switch span { position: absolute; inset: 0; border-radius: 999px; background: rgba(255, 255, 255, .18); transition: background .15s; }
+    .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); transition: transform .15s; }
+    .switch input:checked + span { background: var(--accent); }
+    .switch input:checked + span::after { transform: translateX(18px); }
+    .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .settings .chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 0 16px 14px; }
+    .settings .chips button { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 8px; background: rgba(255, 255, 255, .05);
+      font: inherit; font-size: 13px; cursor: pointer; text-align: left; color: inherit; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .settings .chips button:hover { background: rgba(255, 255, 255, .1); }
+    .settings .chips button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .settings .chips img { width: 18px; height: 18px; flex: none; border-radius: 4px; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; max-width: 250px; }
+    .swatches button { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .2); cursor: pointer; padding: 0; }
+    .swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px #15151d, 0 0 0 4px var(--accent); }
+    .seg { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+    .seg button { height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06); font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
+    .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    .settings .scripts:empty { display: none; }
+    .settings .script { display: flex; align-items: center; gap: 12px; padding: 8px 16px; }
+    .settings .script + .script { border-top: 1px solid rgba(255, 255, 255, .06); }
+    .settings .row-msg { padding: 0 16px 12px; font-size: 12.5px; color: var(--muted); }
+    .settings .row-msg:empty { display: none; }
+    .settings .row-msg.err { color: #ff8f8a; }
+    @media (max-width: 560px) { .settings .row { flex-wrap: wrap; } .settings .ctl { width: 100%; } .settings .ctl .field { flex: 1; width: auto; } }
+  </style>
+</head>
+<body>
+  <div id="bg" class="dust"></div>
+  <img id="accent" src="/assets/armillary.png" alt="">
+
+  <div id="menubar">
+    <button class="mb-btn mb-logo" id="mb-logo" title="GhettoOS" aria-haspopup="true" aria-expanded="false"><img class="logo-img" alt="GhettoOS"></button>
+    <span id="mb-app">Desktop</span>
+    <div class="mb-right">
+      <button class="mb-btn" id="mb-lock" title="Lock screen"><svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+      <span id="mb-user"></span>
+      <span id="mb-date"></span>
+      <span id="mb-time"></span>
+    </div>
+  </div>
+  <div id="mb-menu" hidden>
+    <button data-act="about">About GhettoOS</button>
+    <hr>
+    <button data-act="browser">New Browser Window</button>
+    <button data-act="games">Games</button>
+    <button data-act="settings">Settings…</button>
+    <button data-act="chat">Chat</button>
+    <button data-act="blank">Open in about:blank</button>
+    <hr>
+    <button data-act="account" id="mb-account">Sign in…</button>
+    <button data-act="lock">Lock Screen</button>
+  </div>
+
+  <div id="desktop" aria-label="Desktop"></div>
+  <div id="dock" role="toolbar" aria-label="Dock"></div>
+
+  <div id="lock" hidden>
+    <video id="lock-video" muted playsinline preload="auto" aria-hidden="true"></video>
+    <div class="lock-top"><div class="lock-date" id="lock-date"></div><div class="lock-time" id="lock-time"></div></div>
+    <form class="lock-card" id="lock-form" autocomplete="off">
+      <img class="lock-logo logo-img" alt="">
+      <div class="lock-name" id="lock-name">GhettoOS</div>
+      <input class="pill" id="lock-user" placeholder="Username" autocomplete="username" spellcheck="false" aria-label="Username" maxlength="20">
+      <div class="pill-wrap">
+        <input class="pill" id="lock-pass" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
+        <button class="pill-go" type="submit" title="Sign in"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="lock-msg" id="lock-msg" role="alert"></div>
+      <div class="lock-links">
+        <button type="button" id="lock-mode">Create account</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" id="lock-guest">Continue as guest</button>
+      </div>
+    </form>
+    <div class="lock-foot"><span class="tagline" id="tagline"></span></div>
+  </div>
+
+  <div id="cover" hidden></div>
+  <datalist id="history-list"></datalist>
+
+  <script>
+    // Static build (deploy/index.html from build-static.js, or opened from file://): there is no
+    // server.js. Accounts and settings stay in localStorage, Games reads the catalog straight
+    // from GitHub, AI Chat calls Pollinations, and apps that need the server are hidden.
+    const STATIC = !!window.GHETTO_STATIC || location.protocol === "file:";
+
+    // ======================= Settings (stored in this browser) =======================
+    const DEFAULTS = {
+      // v2 + libcurl passed every site tested (Poki games, YouTube, Google, Wikipedia).
+      // v1 fails Poki's game check; Epoxy hits an HTTP/2 reset on YouTube.
+      engine: "v2",          // "v2" = Scramjet 2.0.67-alpha.1, "v1" = Scramjet 1.1.0
+      transport: "libcurl",  // "libcurl" | "epoxy"
+      wisp: "",              // empty = this server's /wisp/
+      search: "brave",
+      searchCustom: "",      // template with %s
+      cloak: "none",         // disguise preset id (CLOAKS) or "none"
+      cloakTitle: "",        // overrides the preset's title when set
+      cloakIcon: "",         // overrides the preset's icon when set
+      blurCloak: false,      // cover the page with another site while unfocused
+      blurSite: "khan",      // CLOAKS id shown by the cover
+      panicKey: "",
+      panicUrl: "https://classroom.google.com",
+      panicBlank: true,      // the redirect key also reopens GhettoOS in an about:blank tab
+      adblock: true,         // sw.js blocks ad/tracker hosts; pop-up tabs blocked in proxied pages
+      theme: "nebula",       // THEMES key (wallpaper)
+      animBg: "none",        // "none" | "aurora" | "stars" | "lava"
+      layout: "classic",     // "classic" | "compact" dock icons
+      lockOnStart: true,     // show the lock screen when GhettoOS opens
+      userName: "",          // shown in the menu bar; typed on the lock screen
+    };
+    const SETTINGS_REV = 2; // bump to reset saved proxy choices when the recommended defaults change
+    const DESIGN_REV = 1;   // bump to reset saved wallpaper choices when the look changes
+    const settings = (() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem("proxyos-settings") || "{}");
+        if (saved._rev !== SETTINGS_REV) { delete saved.engine; delete saved.transport; }
+        if (saved._design !== DESIGN_REV) { delete saved.theme; delete saved.animBg; }
+        return { ...DEFAULTS, ...saved, _rev: SETTINGS_REV, _design: DESIGN_REV };
+      } catch { return { ...DEFAULTS, _rev: SETTINGS_REV, _design: DESIGN_REV }; }
+    })();
+    // Signed-in username (null = guest) and listeners for when it changes. See "Accounts".
+    let account = null, syncTimer = 0;
+    const onAccountChange = new Set();
+    function saveSettings() {
+      try { localStorage.setItem("proxyos-settings", JSON.stringify(settings)); } catch {}
+      queueSync(); // signed in: also saved to the account (see "Accounts")
+    }
+
+    const SEARCH_ENGINES = {
+      brave: { name: "Brave Search", url: "https://search.brave.com/search?q=%s" },
+      duckduckgo: { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=%s" },
+      google: { name: "Google", url: "https://www.google.com/search?q=%s" },
+      bing: { name: "Bing", url: "https://www.bing.com/search?q=%s" },
+      startpage: { name: "Startpage", url: "https://www.startpage.com/do/search?q=%s" },
+      custom: { name: "Custom…", url: null },
+    };
+
+    // ======================= Proxy engines =======================
+    const ENGINES = {
+      v2: { name: "Scramjet v2 (2.0.67-alpha.1) — recommended" },
+      v1: { name: "Scramjet v1 (1.1.0) — fallback" },
+    };
+    const TRANSPORTS = { libcurl: "libcurl (recommended)", epoxy: "Epoxy" };
+    const ownWisp = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/wisp/";
+    const wispUrl = () => settings.wisp.trim() || ownWisp;
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error("failed to load " + src));
+        document.head.append(s);
+      });
+    }
+
+    // Register /sw.js for the chosen engine and wait until that exact worker is active.
+    async function registerSW(engine) {
+      const url = "/sw.js?engine=" + engine;
+      const reg = await navigator.serviceWorker.register(url);
+      const want = new URL(url, location.href).href;
+      const isWanted = () => reg.active && reg.active.scriptURL === want;
+      if (!isWanted()) {
+        await new Promise((resolve) => {
+          const check = () => { if (isWanted()) resolve(); };
+          reg.addEventListener("updatefound", () => reg.installing?.addEventListener("statechange", check));
+          navigator.serviceWorker.addEventListener("controllerchange", check);
+          const t = setInterval(() => { check(); if (isWanted()) clearInterval(t); }, 200);
+        });
+      }
+      return reg;
+    }
+
+    // Each engine returns { attach(iframe) -> { go(url), current() } }.
+    async function initV1() {
+      await loadScript("/baremux/index.js");
+      await loadScript("/scram/scramjet.all.js");
+      const PREFIX = "/go/";
+      const { ScramjetController } = $scramjetLoadController();
+      const scramjet = new ScramjetController({
+        files: { all: "/scram/scramjet.all.js", wasm: "/scram/scramjet.wasm.wasm", sync: "/scram/scramjet.sync.js" },
+        prefix: PREFIX,
+      });
+      scramjet.init(); // must run before the SW handles requests (it creates the config DB)
+      await registerSW("v1");
+      const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+      if (settings.transport === "libcurl") await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl() }]);
+      else await connection.setTransport("/epoxy/index.mjs", [{ wisp: wispUrl() }]);
+      return {
+        attach(iframe) {
+          return {
+            go: (url) => (iframe.src = PREFIX + encodeURIComponent(url)), // scramjet.prefix + encodeURIComponent(url)
+            current() {
+              const p = iframe.contentWindow.location.pathname;
+              return p.startsWith(PREFIX) ? decodeURIComponent(p.slice(PREFIX.length)) : null;
+            },
+          };
+        },
+      };
+    }
+
+    async function initV2() {
+      await loadScript("/scramjet/scramjet.js");
+      await loadScript("/controller/controller.api.js");
+      const reg = await registerSW("v2");
+      const { Controller } = $scramjetController;
+      const { defaultConfig } = $scramjet;
+      let transport;
+      if (settings.transport === "libcurl") {
+        const { default: LibcurlClient } = await import("/libcurl2/index.mjs"); // libcurl-transport 2.0.6
+        transport = new LibcurlClient({ wisp: wispUrl() });
+      } else {
+        await loadScript("/epoxy3/index.js"); // epoxy-transport 3.0.1
+        transport = new self.EpoxyTransport.default({ wisp: wispUrl() });
+      }
+      await transport.init();
+      const controller = new Controller({ serviceworker: reg.active, transport, scramjetConfig: defaultConfig });
+      await controller.wait();
+      return {
+        attach(iframe) {
+          const frame = controller.createFrame(iframe);
+          return {
+            go: (url) => frame.go(url),
+            current() {
+              const p = iframe.contentWindow.location.pathname;
+              const pre = new URL(frame.prefix, location.href).pathname;
+              return p.startsWith(pre) ? decodeURIComponent(p.slice(pre.length)) : null;
+            },
+          };
+        },
+      };
+    }
+
+    const proxyReady = STATIC
+      ? Promise.reject(new Error("The web browser needs the GhettoOS server."))
+      : (settings.engine === "v2" ? initV2() : initV1()).catch((e) => {
+        console.error("proxy init failed", e);
+        throw e;
+      });
+    proxyReady.catch(() => {}); // handled where it's used
+
+    function toUrl(input) {
+      input = input.trim();
+      if (/^https?:\/\//i.test(input)) return input;
+      if (input.includes(".") && !input.includes(" ")) return "https://" + input;
+      const tpl = settings.search === "custom" ? settings.searchCustom : SEARCH_ENGINES[settings.search]?.url;
+      return (tpl && tpl.includes("%s") ? tpl : SEARCH_ENGINES.brave.url).replace("%s", encodeURIComponent(input));
+    }
+
+    // ======================= Windows =======================
+    // Every window belongs to an app (its dock icon). Minimized windows are hidden (CSS) and
+    // come back from the dock; the menu bar shows the focused window's app.
+    const openWindows = new Set(); // { app, win }
+    const MENU_H = 30;
+    const dockSpace = () => (settings.layout === "compact" ? 40 : 52) + 26;
+    function openWindow(title, el, opts = {}) {
+      const { app = title, onclose: closed, ...rest } = opts;
+      const rec = { app, win: null };
+      openWindows.add(rec);
+      rec.win = new WinBox(title, {
+        mount: el, width: "70%", height: "70%", x: "center", y: "center", top: MENU_H, bottom: dockSpace(), ...rest,
+        onfocus: () => setActiveApp(app),
+        onminimize: () => { refreshDock(); setActiveApp(frontApp()); },
+        onrestore: () => refreshDock(),
+        onclose: () => { openWindows.delete(rec); closed?.(); refreshDock(); setActiveApp(frontApp()); },
+      });
+      refreshDock();
+      return rec.win;
+    }
+    // App of the top-most visible window (WinBox raises z-index on focus).
+    function frontApp() {
+      let best = null, z = -1;
+      for (const r of openWindows) {
+        const zi = +r.win.window.style.zIndex || 0;
+        if (!r.win.min && zi > z) { z = zi; best = r.app; }
+      }
+      return best || "Desktop";
+    }
+    function setActiveApp(name) { document.getElementById("mb-app").textContent = name; }
+
+    // ======================= Browser app =======================
+    // With `app` ({ name, url, icon }) the window is a site shortcut: no address bar,
+    // just back / forward / reload / home, and the window keeps the app's name.
+    function openBrowser(startUrl, app) {
+      const el = document.createElement("div");
+      el.className = app ? "app site-app" : "app";
+      const svg = (d) => `<svg class="i" viewBox="0 0 24 24"><path d="${d}"/></svg>`;
+      const nav = `<button type="button" data-nav="back" title="Back">${svg("M15 18l-6-6 6-6")}</button><button type="button" data-nav="forward" title="Forward">${svg("M9 18l6-6-6-6")}</button><button type="button" data-nav="reload" title="Reload">${svg("M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5")}</button>`;
+      el.innerHTML = app
+        ? `<form class="bar">${nav}<button type="button" data-nav="home" title="Home">${svg("M3 11l9-8 9 8M5 10v10h14V10")}</button><span class="app-title"></span><input type="hidden"></form><iframe></iframe>`
+        : `<form class="bar">${nav}<input list="history-list" placeholder="Search or enter address"><button class="go">Go</button></form><iframe></iframe>`;
+      const input = el.querySelector("input");
+      const iframe = el.querySelector("iframe");
+      const win = openWindow(app ? app.name : "Browser", el, { app: app ? app.name : "Browser" });
+      if (app) el.querySelector(".app-title").textContent = app.name;
+      let tab = null;
+
+      const ready = proxyReady.then((engine) => (tab = engine.attach(iframe)), (e) => {
+        iframe.srcdoc = `<p style="font-family:sans-serif">Proxy failed to start: ${String(e.message).replace(/</g, "&lt;")}<br>Try a different engine or transport in Settings.</p>`;
+        throw e;
+      });
+
+      async function go(raw) {
+        const url = toUrl(raw);
+        input.value = url;
+        await ready;
+        tab.go(url);
+      }
+      el.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); go(input.value); });
+      if (!app) input.addEventListener("focus", fillHistoryList);
+
+      // The proxied page is same-origin, so its history can be driven directly.
+      el.querySelectorAll("[data-nav]").forEach((b) => (b.onclick = () => {
+        try {
+          const w = iframe.contentWindow;
+          if (b.dataset.nav === "home") go(app.url);
+          else if (b.dataset.nav === "back") w.history.back();
+          else if (b.dataset.nav === "forward") w.history.forward();
+          else w.location.reload();
+        } catch {}
+      }));
+
+      // Keep the address bar and title in sync with in-page navigation.
+      let retries = 0;
+      iframe.addEventListener("load", () => {
+        hookPanic(iframe);
+        // App windows: a flaky upstream TLS connect (duck.ai does this) shows the SW's error
+        // page; retry by itself up to 3 times, waiting 1 s, 2 s, then 4 s.
+        try {
+          if (app && retries < 3 && /^Internal Service Worker Error/.test(iframe.contentDocument.body?.innerText || "")) {
+            const wait = 1000 * 2 ** retries++;
+            return setTimeout(() => iframe.contentWindow.location.reload(), wait);
+          }
+        } catch {}
+        // Block ads: proxied pages can't open pop-up / pop-under tabs.
+        if (settings.adblock) try { iframe.contentWindow.open = () => null; } catch {}
+        try {
+          const real = tab?.current();
+          if (real) {
+            input.value = real;
+            if (!app) win.setTitle(iframe.contentDocument.title || real);
+            addHistory(real, iframe.contentDocument.title);
+            runUserscripts(iframe, real);
+          }
+        } catch {}
+      });
+
+      if (startUrl) go(startUrl);
+      else input.focus();
+      return win;
+    }
+
+    // ======================= Games app =======================
+    // /catalog/ merges Truffled, Seraph, Chicken King's Vault and UGS into
+    // { source, name, cover, url, mirrors?, names?, launch } entries.
+    let catalogPromise;
+    const loadCatalog = () =>
+      (catalogPromise ??= (STATIC ? staticCatalog() : fetch("/catalog/").then((r) => {
+        if (!r.ok) throw new Error("catalog " + r.status);
+        return r.json();
+      })).catch((e) => { catalogPromise = null; throw e; }));
+
+    // Static build: the same merge as catalog.js, done in the browser (GitHub and jsDelivr
+    // allow cross-origin reads). Games that need the proxy ("proxy" launch) are left out.
+    async function staticCatalog() {
+      const getText = async (url) => { const r = await fetch(url); if (!r.ok) throw new Error(`${r.status} from ${url}`); return r.text(); };
+      const latestSha = async (repo) => {
+        try {
+          const r = await fetch(`https://api.github.com/repos/${repo}/commits/main`, { headers: { accept: "application/vnd.github.sha" } });
+          const sha = r.ok ? (await r.text()).trim() : "";
+          if (/^[0-9a-f]{40}$/.test(sha)) return sha;
+        } catch {}
+        return "main";
+      };
+      const raw = (repo, ref, path) => `https://raw.githubusercontent.com/${repo}/${ref}/${path}`;
+      const jsd = (repo, ref, path) => `https://cdn.jsdelivr.net/gh/${repo}@${ref}/${path}`;
+      const decode = (s) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+      const sources = {
+        async truffled() {
+          const repo = "skidding-code/truffled-lib", sha = await latestSha(repo);
+          return JSON.parse(await getText(raw(repo, sha, "zones.json"))).flatMap((z) => {
+            const url = String(z.url), base = { source: "Truffled", name: z.name, cover: z.cover, names: z.altNames };
+            if (url.startsWith("http")) return []; // needs the proxy
+            if (z.special?.includes("threads")) return [{ ...base, url: `https://cdn.jsdelivr.net/gh/${repo}@coi3/index.xhtml?g=${z.id}`, launch: "threads" }];
+            const file = url.replace("{HTML_URL}/", "html/");
+            return [{ ...base, url: jsd(repo, sha, file), mirrors: [jsd(repo, "lib", file), raw(repo, sha, file)], launch: "write" }];
+          });
+        },
+        async seraph() {
+          const repo = "a456pur/seraph", sha = await latestSha(repo);
+          const site = `https://rawcdn.githack.com/${repo}/${sha}/games/`;
+          const html = await getText(raw(repo, sha, "games/index.html"));
+          const re = /<a[^>]*href="([^"]+)"[^>]*>\s*<div class="button"[^>]*url\('([^']+)'\)[^>]*>\s*<h2>([^<]+)<\/h2>/g;
+          const seen = new Set(), out = [];
+          for (const [, href, thumb, name] of html.matchAll(re)) {
+            if (/^(https?:)?\/\//.test(href) || seen.has(href)) continue;
+            seen.add(href);
+            out.push({ source: "Seraph", name: decode(name), cover: new URL(thumb, site).href, url: new URL(href, site).href, launch: "frame" });
+          }
+          return out;
+        },
+        async chickenKingsVault() {
+          const repo = "wanocapy/ChickenKingsVault", site = "https://wanocapy.github.io/ChickenKingsVault/";
+          const js = await getText(raw(repo, await latestSha(repo), "games.js"));
+          const re = /<a class="game-link" href="([^"]+)">\s*<img src="([^"]+)"[^>]*>\s*<div>([^<]+)<\/div>/g;
+          return [...js.matchAll(re)].map(([, href, img, name]) => ({ source: "Chicken King's Vault", name: decode(name), cover: new URL(img, site).href, url: new URL(href, site).href, launch: "frame" }));
+        },
+        async ugs() {
+          const repo = "bubbls/ugs-singlefile", sha = await latestSha(repo);
+          const js = await getText(raw(repo, sha, "games.js"));
+          const start = js.indexOf("["), list = js.slice(start, js.indexOf("];", start) + 1);
+          const extra = new Set(["supremeduelistfix", "thiefpuzzle"]);
+          return [...list.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]).filter((n) => n.startsWith("cl") || extra.has(n)).map((n) => {
+            const file = "UGS-Files/" + encodeURIComponent(n + ".html");
+            return { source: "UGS", name: n.startsWith("cl") ? n.slice(2) : n, cover: null, url: jsd(repo, sha, file), mirrors: [raw(repo, sha, file)], launch: "write" };
+          });
+        },
+      };
+      const lists = await Promise.all(Object.entries(sources).map(([k, f]) => f().catch((e) => { console.warn(`catalog: ${k} failed: ${e.message}`); return []; })));
+      const games = lists.flat();
+      if (!games.length) throw new Error("couldn't load any game library");
+      return games;
+    }
+
+    // Initial-letter tile for games without a cover (or whose cover fails to load).
+    function letterIcon(name) {
+      const d = document.createElement("div");
+      d.className = "letter";
+      const ch = (name.match(/[a-z0-9]/i) || ["?"])[0].toUpperCase();
+      d.textContent = ch;
+      let h = 0;
+      for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+      d.style.background = `hsl(${h % 360} 55% 45%)`;
+      return d;
+    }
+
+    // Favorites and recently played games ("source|name" keys; URLs change with each catalog
+    // commit). Saved locally, and to the account when signed in. "write" games that have been
+    // played once also work offline: sw.js keeps their files.
+    const FAV_KEY = "proxyos-favorites", PLAYED_KEY = "proxyos-played";
+    const gameKey = (g) => g.source + "|" + g.name;
+    const readList = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
+    let favorites = new Set(readList(FAV_KEY));
+    let played = readList(PLAYED_KEY);
+    // Notepad notes: [{id, text, updated}] (synced to the account like favorites).
+    const NOTES_KEY = "proxyos-notes";
+    let notes = readList(NOTES_KEY);
+    let notesRender = null; // set while a Notepad window is open
+    function notesChanged() { notesRender?.(); }
+    function saveNotes() {
+      try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch {}
+      queueSync();
+    }
+    function saveGameLists() {
+      try {
+        localStorage.setItem(FAV_KEY, JSON.stringify([...favorites]));
+        localStorage.setItem(PLAYED_KEY, JSON.stringify(played));
+      } catch {}
+      queueSync();
+    }
+    const worksOffline = (g) => g.launch === "write" && played.includes(gameKey(g));
+
+    function openGames() {
+      const el = document.createElement("div");
+      el.className = "app";
+      el.innerHTML = `
+        <div class="picker"><div class="bar"><input type="search" placeholder="Search games"><select><option value="">All games</option><option value="@fav">★ Favorites</option><option value="@played">Played (offline-ready)</option></select></div><div class="status">Loading…</div><div class="grid"></div></div>
+        <div class="player" hidden>
+          <div class="bar">
+            <span class="game-title"></span>
+            <span class="game-msg"></span>
+            <button type="button" data-act="fav" title="Favorite">&#x2606;</button>
+            <button type="button" data-act="fullscreen" title="Full screen">&#x26F6;</button>
+            <button type="button" data-act="download" title="Download as .html">&#x2B07;</button>
+            <button type="button" data-act="close" title="Close game (back to games)">&#x2715;</button>
+          </div>
+        </div>`;
+      const input = el.querySelector("input");
+      const select = el.querySelector("select");
+      const status = el.querySelector(".status");
+      const grid = el.querySelector(".grid");
+      const win = openWindow("Games", el);
+
+      // ---- Player view: one game at a time inside this window ----
+      const picker = el.querySelector(".picker");
+      const player = el.querySelector(".player");
+      const msg = el.querySelector(".game-msg");
+      let current = null, frame = null, refresh = () => {};
+      const favBtn = player.querySelector('[data-act="fav"]');
+      const markFavBtn = () => {
+        const on = !!current && favorites.has(gameKey(current));
+        favBtn.classList.toggle("on", on);
+        favBtn.innerHTML = on ? "&#x2605;" : "&#x2606;";
+        favBtn.title = on ? "Remove from favorites" : "Add to favorites";
+      };
+      const toggleFav = (g) => {
+        const k = gameKey(g);
+        favorites.has(k) ? favorites.delete(k) : favorites.add(k);
+        saveGameLists();
+        refresh();
+        markFavBtn();
+      };
+      favBtn.onclick = () => current && toggleFav(current);
+      const play = (g) => {
+        played = [gameKey(g), ...played.filter((k) => k !== gameKey(g))].slice(0, 200);
+        saveGameLists();
+        if (g.launch === "proxy") return openBrowser(g.url); // external sites go through the proxy Browser
+        current = g;
+        markFavBtn();
+        frame = document.createElement("iframe");
+        frame.allow = "autoplay; fullscreen; gamepad; cross-origin-isolated";
+        player.append(frame);
+        el.querySelector(".game-title").textContent = g.name;
+        msg.textContent = "";
+        picker.hidden = true;
+        player.hidden = false;
+        win.setTitle(g.name);
+        launchGame(g, frame);
+      };
+      const closeGame = () => {
+        frame?.remove(); // removing the iframe stops the game and its sound
+        frame = current = null;
+        refresh();
+        player.hidden = true;
+        picker.hidden = false;
+        win.setTitle("Games");
+      };
+      player.querySelector('[data-act="close"]').onclick = closeGame;
+      player.querySelector('[data-act="fullscreen"]').onclick = () => frame?.requestFullscreen?.().catch(() => {});
+      player.querySelector('[data-act="download"]').onclick = async () => {
+        if (!current) return;
+        msg.textContent = "Preparing download…";
+        try {
+          const { offline } = await downloadGame(current);
+          msg.textContent = offline ? "Downloaded." : "Downloaded (needs internet to play).";
+        } catch (e) {
+          msg.textContent = "Download failed: " + e.message;
+        }
+      };
+
+      loadCatalog().then((games) => {
+        for (const s of [...new Set(games.map((g) => g.source))]) {
+          select.append(new Option(`${s} (${games.filter((g) => g.source === s).length})`, s));
+        }
+        const frag = document.createDocumentFragment();
+        const items = games.map((g) => {
+          const wrap = document.createElement("div");
+          wrap.className = "tile-wrap";
+          const b = document.createElement("button");
+          b.className = "game";
+          b.title = `${g.name} — ${g.source}`;
+          if (g.cover) {
+            const img = document.createElement("img");
+            img.loading = "lazy";
+            img.alt = "";
+            img.src = g.cover;
+            img.onerror = () => img.replaceWith(letterIcon(g.name));
+            b.append(img);
+          } else {
+            b.append(letterIcon(g.name));
+          }
+          const label = document.createElement("span");
+          label.textContent = g.name;
+          const src = document.createElement("small");
+          src.textContent = g.source;
+          const badge = Object.assign(document.createElement("small"), { className: "game-badge" });
+          b.append(label, src, badge);
+          b.onclick = () => play(g);
+          const star = document.createElement("button");
+          star.className = "fav";
+          star.type = "button";
+          star.onclick = (e) => { e.stopPropagation(); toggleFav(g); };
+          wrap.append(b, star);
+          frag.append(wrap);
+          return { g, wrap, star, badge, hay: [g.name, ...(g.names || [])].join(" ").toLowerCase(), source: g.source };
+        });
+        grid.append(frag);
+        const filter = (keepScroll) => {
+          const q = input.value.trim().toLowerCase();
+          const s = select.value;
+          let n = 0;
+          for (const it of items) {
+            const k = gameKey(it.g), fav = favorites.has(k);
+            const inList = !s || (s === "@fav" ? fav : s === "@played" ? played.includes(k) : it.source === s);
+            const show = inList && (!q || it.hay.includes(q));
+            it.wrap.hidden = !show;
+            n += show;
+            if (it.fav !== fav) { // only touch the DOM when something changed (≈5000 tiles)
+              it.fav = fav;
+              it.star.classList.toggle("on", fav);
+              it.star.textContent = fav ? "★" : "☆";
+              it.star.title = fav ? "Remove from favorites" : "Add to favorites";
+            }
+            const off = worksOffline(it.g);
+            if (it.off !== off) { it.off = off; it.badge.textContent = off ? "✓ Works offline" : ""; }
+          }
+          status.textContent = s === "@fav" && !n && !q ? "No favorites yet. Hover a game and click its ☆." : `${n} games`;
+          if (keepScroll !== true) grid.scrollTop = 0;
+        };
+        refresh = () => filter(true);
+        input.addEventListener("input", filter);
+        select.addEventListener("change", filter);
+        filter();
+        input.focus();
+      }, (e) => (status.textContent = "Couldn't load catalog: " + e.message));
+    }
+
+    async function fetchFirst(urls) {
+      let last;
+      for (const u of urls) {
+        try {
+          const r = await fetch(u);
+          if (r.ok) return { html: await r.text(), url: r.url || u };
+          last = new Error(r.status + " " + r.statusText);
+        } catch (e) { last = e; }
+      }
+      throw last;
+    }
+
+    // Load game `g` into `frame` (proxy games are handled by the caller).
+    async function launchGame(g, frame) {
+      // "frame": static game sites (Seraph via githack, Chicken King's Vault on GitHub Pages).
+      // "threads": truffled games needing SharedArrayBuffer, served cross-origin-isolated by jsDelivr.
+      if (g.launch === "frame" || g.launch === "threads") {
+        frame.src = g.url;
+        return;
+      }
+
+      // "write": CDN games – fetch the HTML and write it into a same-origin (about:blank) iframe. Not proxied.
+      try {
+        const { html } = await fetchFirst([g.url, ...(g.mirrors || [])]);
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        hookPanic(frame);
+      } catch (e) {
+        frame.srcdoc = "Couldn't load game: " + String(e.message).replace(/</g, "&lt;");
+      }
+    }
+
+    // Save game `g` as a standalone .html that runs when opened from the file manager.
+    // The game's own HTML is saved with a <base> pointing at where it came from, so any
+    // separate files it loads (scripts, images, sounds) still come from the CDN.
+    // Single-file games then work fully offline. If the HTML can't be fetched (CORS) or the
+    // game needs cross-origin isolation ("threads"), a small launcher file is saved instead.
+    async function downloadGame(g) {
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+      let html = null, offline = false;
+      if (g.launch === "write" || g.launch === "frame") {
+        try {
+          const got = await fetchFirst(g.launch === "write" ? [g.url, ...(g.mirrors || [])] : [g.url]);
+          html = got.html;
+          const own = html.match(/<base\s[^>]*href\s*=\s*["']?([^"'\s>]+)/i);
+          const base = own ? new URL(own[1], got.url).href : got.url;
+          html = html.replace(/<base\s[^>]*>/gi, "");
+          const tag = `<base href="${esc(base)}">`;
+          const dt = html.match(/^\s*<!doctype[^>]*>/i); // keep the doctype first (else quirks mode)
+          html = dt ? dt[0] + tag + html.slice(dt[0].length) : tag + html;
+          // Offline if it doesn't pull in any external files (scripts, styles, images, media, frames).
+          offline = !/<(script|link|img|iframe|source|audio|video|embed|object)\b[^>]*\b(src|href|data)\s*=\s*["']?(?!data:|blob:|#)[^"'\s>]/i.test(html);
+        } catch { html = null; }
+      }
+      if (html == null) {
+        html = g.launch === "threads"
+          // Needs cross-origin isolation, which a local file can't provide, so jump to the real page.
+          ? `<!doctype html><meta charset="utf-8"><title>${esc(g.name)}</title><script>location.replace(${JSON.stringify(g.url)})<\/script><a href="${esc(g.url)}">Play ${esc(g.name)}</a>`
+          : `<!doctype html><meta charset="utf-8"><title>${esc(g.name)}</title><style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}</style><iframe src="${esc(g.url)}" allow="autoplay; fullscreen; gamepad" allowfullscreen></iframe>`;
+      }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      a.download = (g.name.replace(/[\\/:*?"<>|]+/g, "").trim() || "game") + ".html";
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      return { offline };
+    }
+
+    // ======================= Cloaking =======================
+    const CLOAKS = [
+      { id: "classroom", name: "Google Classroom", title: "Home", domain: "classroom.google.com" },
+      { id: "gmail", name: "Gmail", title: "Inbox - Gmail", domain: "mail.google.com" },
+      { id: "drive", name: "Google Drive", title: "My Drive - Google Drive", domain: "drive.google.com" },
+      { id: "docs", name: "Google Docs", title: "Untitled document - Google Docs", domain: "docs.google.com" },
+      { id: "google", name: "Google", title: "Google", domain: "google.com" },
+      { id: "schoology", name: "Schoology", title: "Home | Schoology", domain: "schoology.com" },
+      { id: "deltamath", name: "DeltaMath", title: "DeltaMath", domain: "deltamath.com" },
+      { id: "canvas", name: "Canvas", title: "Dashboard", domain: "instructure.com" },
+      { id: "clever", name: "Clever", title: "Clever | Portal", domain: "clever.com" },
+      { id: "khan", name: "Khan Academy", title: "Khan Academy", domain: "khanacademy.org", url: "https://www.khanacademy.org/" },
+      { id: "ixl", name: "IXL", title: "IXL | Dashboard", domain: "ixl.com" },
+      { id: "quizlet", name: "Quizlet", title: "Quizlet", domain: "quizlet.com" },
+      { id: "desmos", name: "Desmos", title: "Desmos | Graphing Calculator", domain: "desmos.com" },
+      { id: "edpuzzle", name: "Edpuzzle", title: "Edpuzzle", domain: "edpuzzle.com" },
+      { id: "kahoot", name: "Kahoot!", title: "Kahoot!", domain: "kahoot.it" },
+    ];
+    const iconFor = (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    // GhettoOS logo (lock screen, menu bar, About, tab favicon when not disguised): the user's
+    // armillary-sphere engraving, cropped to the sphere's outer ring so it fills a circle exactly
+    // (centre 208,186, radius 183 in armillary.png → 512×512 armillary-logo.png).
+    const GHETTO_ICON = "/assets/armillary-logo.png";
+    const ORIGINAL = { title: "GhettoOS", icon: GHETTO_ICON };
+    function useLogo(src) {
+      ORIGINAL.icon = src;
+      document.querySelectorAll(".logo-img").forEach((i) => (i.src = src));
+    }
+
+    // Tab title / icon: the disguise preset, with Settings' title and icon overrides on top.
+    function currentCloak() {
+      const c = CLOAKS.find((c) => c.id === settings.cloak);
+      return {
+        title: settings.cloakTitle || c?.title || ORIGINAL.title,
+        icon: settings.cloakIcon || (c ? iconFor(c.domain) : ORIGINAL.icon),
+      };
+    }
+    function applyCloak() {
+      if (covered) return; // the unfocused cover owns the title while it's up
+      const { title, icon } = currentCloak();
+      document.title = title;
+      document.getElementById("favicon").href = icon;
+    }
+
+    // Open this site inside an about:blank tab (the address bar then shows about:blank).
+    function openAboutBlank(silent) {
+      const w = window.open("about:blank", "_blank");
+      if (!w) { if (!silent) alert("Pop-up blocked. Allow pop-ups for this site and try again."); return; }
+      const { title, icon } = currentCloak();
+      const d = w.document;
+      d.title = title;
+      const link = d.createElement("link");
+      link.rel = "icon";
+      link.href = icon;
+      d.head.append(link);
+      d.body.style.margin = "0";
+      const f = d.createElement("iframe");
+      f.src = location.href;
+      f.style.cssText = "border:0;position:fixed;inset:0;width:100%;height:100%";
+      d.body.append(f);
+    }
+
+    // ======================= Cover when unfocused =======================
+    // While the tab is hidden or focus is elsewhere (another window, the address bar), a decoy
+    // site covers everything and the tab title/icon match it. document.hasFocus() stays true
+    // while an iframe inside GhettoOS has focus, so clicking into a window doesn't trigger it.
+    const coverEl = document.getElementById("cover");
+    let covered = false, coverLoadedFor = null;
+    const coverSite = () => CLOAKS.find((c) => c.id === settings.blurSite) || CLOAKS.find((c) => c.id === "khan");
+    function showCover() {
+      const c = coverSite();
+      document.title = c.title;
+      document.getElementById("favicon").href = iconFor(c.domain);
+      if (coverLoadedFor !== c.id) { // load the decoy once, then keep it
+        coverLoadedFor = c.id;
+        coverEl.innerHTML = "<iframe></iframe>";
+        const f = coverEl.firstChild;
+        proxyReady.then((engine) => engine.attach(f).go(c.url || "https://" + c.domain + "/")).catch(() => {});
+      }
+      coverEl.hidden = false;
+    }
+    function hideCover() {
+      coverEl.hidden = true;
+      applyCloak();
+    }
+    setInterval(() => {
+      const away = settings.blurCloak && (document.hidden || !document.hasFocus());
+      if (away === covered) return;
+      covered = away;
+      away ? showCover() : hideCover();
+    }, 250);
+
+    // ======================= Tab redirect (panic) key =======================
+    // Jumps this tab to the redirect URL, and (optionally) first reopens GhettoOS in an
+    // about:blank tab. Also hooked into same-origin iframes (proxied pages, CDN games).
+    const isTyping = (t) => !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""));
+    const withScheme = (u) => (/^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u);
+    function onPanicKey(e) {
+      if (!settings.panicKey || e.key !== settings.panicKey || e.repeat || isTyping(e.target)) return;
+      e.preventDefault();
+      if (settings.panicBlank) openAboutBlank(true);
+      window.top.location.href = withScheme(settings.panicUrl || DEFAULTS.panicUrl);
+    }
+    function hookPanic(iframe) {
+      try { iframe.contentWindow.addEventListener("keydown", onPanicKey, true); } catch {}
+    }
+    window.addEventListener("keydown", onPanicKey, true);
+
+    // ======================= Ad blocking =======================
+    // sw.js reads the setting from Cache Storage (it can't see localStorage) and gets live updates.
+    async function syncAdblock() {
+      try {
+        const c = await caches.open("proxyos-config");
+        await c.put("/__config/adblock", new Response(settings.adblock ? "1" : "0"));
+        const reg = await navigator.serviceWorker.getRegistration("/");
+        reg?.active?.postMessage({ adblock: settings.adblock });
+      } catch {}
+    }
+
+    // ======================= Appearance =======================
+    // Wallpapers are pure CSS (no images), so they cost nothing to keep on screen.
+    const glow = (a, b) => `radial-gradient(ellipse 70% 55% at 20% 20%, ${a}, transparent 70%), radial-gradient(ellipse 60% 50% at 85% 85%, ${b}, transparent 70%)`;
+    const THEMES = {
+      nebula: { name: "Nebula", bg: "var(--wall)" },
+      midnight: { name: "Midnight", bg: "#08080d" },
+      graphite: { name: "Graphite", bg: "#1b1b22" },
+      ocean: { name: "Deep ocean", bg: `${glow("rgba(30, 90, 170, .45)", "rgba(20, 130, 140, .3)")}, #050a16` },
+      plum: { name: "Plum", bg: `${glow("rgba(140, 50, 160, .45)", "rgba(220, 80, 120, .25)")}, #0d0614` },
+      forest: { name: "Forest", bg: `${glow("rgba(30, 120, 80, .40)", "rgba(180, 150, 60, .22)")}, #050d0a` },
+      ember: { name: "Ember", bg: `${glow("rgba(190, 80, 40, .40)", "rgba(224, 184, 102, .25)")}, #120806` },
+      gold: { name: "Antique gold", bg: `${glow("rgba(224, 184, 102, .35)", "rgba(120, 80, 30, .3)")}, #0e0b06` },
+    };
+    const ANIM_BGS = { none: "None", aurora: "Aurora", stars: "Starfield", lava: "Lava lamp" };
+    function applyAppearance() {
+      const t = THEMES[settings.theme] || THEMES.nebula;
+      const anim = ANIM_BGS[settings.animBg] && settings.animBg !== "none" ? settings.animBg : "";
+      document.body.style.background = t.bg;
+      document.getElementById("bg").className = anim ? "bg-" + anim : "dust";
+      document.body.classList.toggle("compact", settings.layout === "compact");
+    }
+
+    // ======================= Visited sites =======================
+    const HISTORY_KEY = "proxyos-history";
+    let visited = [];
+    try { visited = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch {}
+    function addHistory(url, title) {
+      if (!/^https?:\/\//.test(url)) return;
+      visited = [{ url, title: title || "" }, ...visited.filter((h) => h.url !== url)].slice(0, 200);
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(visited)); } catch {}
+    }
+    function clearHistory() {
+      visited = [];
+      try { localStorage.removeItem(HISTORY_KEY); } catch {}
+      fillHistoryList();
+    }
+    function fillHistoryList() { // <datalist> behind every Browser address bar
+      const list = document.getElementById("history-list");
+      list.replaceChildren(...visited.map((h) => Object.assign(document.createElement("option"), { value: h.url, label: h.title })));
+    }
+
+    // ======================= Userscripts =======================
+    // Greasemonkey-style scripts ({ name, matches, code }) injected into matching proxied pages
+    // when they finish loading, with a small GM_* shim. Added by URL (downloaded once through
+    // /api/userscript) or by pasting the code.
+    const USERSCRIPTS_KEY = "proxyos-userscripts";
+    let userscripts = [];
+    try { userscripts = JSON.parse(localStorage.getItem(USERSCRIPTS_KEY) || "[]"); } catch {}
+    function saveUserscripts() {
+      queueSync();
+      try { localStorage.setItem(USERSCRIPTS_KEY, JSON.stringify(userscripts)); return true; } catch { return false; }
+    }
+    function parseUserscriptMeta(code) {
+      const meta = code.match(/==UserScript==([\s\S]*?)==\/UserScript==/)?.[1] || "";
+      return {
+        name: meta.match(/@name\s+(.+)/)?.[1].trim(),
+        matches: [...meta.matchAll(/@(?:match|include)\s+(\S+)/g)].map((m) => m[1]),
+      };
+    }
+    function patternToRegExp(p) {
+      if (p === "*" || p === "<all_urls>") return /^https?:\/\//;
+      if (p.length > 2 && p.startsWith("/") && p.endsWith("/")) { try { return new RegExp(p.slice(1, -1)); } catch { return null; } }
+      // Greasemonkey glob: "*://*.site.com/*" also matches site.com itself.
+      const parts = p.replace("://*.", "://\u0001").split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
+      return new RegExp("^" + parts.join(".*").replace("\u0001", "(?:[^/]*\\.)?") + "$");
+    }
+    const userscriptMatches = (s, url) => (s.matches.length ? s.matches : ["*"]).some((m) => patternToRegExp(m)?.test(url));
+    const GM_SHIM = `const unsafeWindow = window, GM_info = { script: {} };
+const GM_addStyle = (css) => { const s = document.createElement("style"); s.textContent = css; (document.head || document.documentElement).append(s); return s; };
+const GM_getValue = (k, d) => { try { const v = localStorage.getItem("GM_" + k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+const GM_setValue = (k, v) => { try { localStorage.setItem("GM_" + k, JSON.stringify(v)); } catch {} };
+const GM_deleteValue = (k) => { try { localStorage.removeItem("GM_" + k); } catch {} };
+const GM_openInTab = (u) => window.open(u, "_blank");
+`;
+    function runUserscripts(iframe, url) {
+      for (const s of userscripts) {
+        if (!s.enabled || !userscriptMatches(s, url)) continue;
+        try {
+          const d = iframe.contentDocument;
+          const el = d.createElement("script");
+          el.textContent = `(function () {\n${GM_SHIM}${s.code}\n})();`;
+          (d.head || d.documentElement).append(el);
+        } catch (e) { console.warn("userscript failed:", s.name, e); }
+      }
+    }
+    async function addUserscript(input) {
+      let code = input.trim();
+      if (!code) throw new Error("Paste a script URL or its code first.");
+      let source = "";
+      if (/^https?:\/\/\S+$/.test(code)) {
+        source = code;
+        const r = await fetch("/api/userscript?url=" + encodeURIComponent(code));
+        code = await r.text();
+        if (!r.ok) throw new Error(code);
+      }
+      const { name, matches } = parseUserscriptMeta(code);
+      const script = { id: Date.now().toString(36), name: name || "Untitled script", matches, code, source, enabled: true };
+      userscripts.push(script);
+      if (!saveUserscripts()) { userscripts.pop(); throw new Error("Not enough storage space for that script."); }
+      return script;
+    }
+
+    // ======================= Clear all data =======================
+    async function clearAllData() {
+      if (!confirm(STATIC
+        ? "Clear all GhettoOS data on this device? This removes your settings, scripts, notes and every account saved in this browser."
+        : "Clear all GhettoOS data on this device? This removes your settings, scripts, visited sites, and the cookies and logins of every site you've opened here, and signs you out. Your account's saved settings stay on the server.")) return;
+      try { await fetch("/api/auth/logout", { method: "POST" }); } catch {}
+      try { localStorage.clear(); sessionStorage.clear(); } catch {}
+      try { // proxied sites' cookies and storage live in IndexedDB
+        const dbs = await indexedDB.databases();
+        await Promise.all(dbs.map((d) => new Promise((done) => {
+          const q = indexedDB.deleteDatabase(d.name);
+          q.onsuccess = q.onerror = q.onblocked = () => done();
+        })));
+      } catch {}
+      try { for (const k of await caches.keys()) await caches.delete(k); } catch {}
+      try { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch {}
+      for (const c of document.cookie.split(";")) {
+        const name = c.split("=")[0].trim();
+        if (name) document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+      }
+      location.reload();
+    }
+
+    // ======================= Settings app =======================
+    function openSettings() {
+      const el = document.createElement("div");
+      el.className = "app settings";
+      const toggle = (n) => `<label class="switch"><input type="checkbox" name="${n}"><span></span></label>`;
+      const row = (title, desc, ctl) => `<div class="row"><div class="txt"><b>${title}</b><small>${desc}</small></div>${ctl ? `<div class="ctl">${ctl}</div>` : ""}</div>`;
+      el.innerHTML = `<div class="set-scroll">
+        <section><h3>Account</h3>
+          ${row(`<span data-acct-title></span>`, `<span data-acct-desc></span>`, `<button class="btn" name="acctBtn"></button>`)}
+        </section>
+        <section><h3>Privacy</h3>
+          ${row("Cover when unfocused", "Covers GhettoOS with another site whenever you click away or switch tabs, until you come back.", toggle("blurCloak"))}
+          ${row("Cover page", "The site shown while covered. The tab title and icon change to match it.", `<select class="field" name="blurSite"></select>`)}
+          ${row("Open in about:blank", "Reopens GhettoOS inside an about:blank tab, so the address bar only shows about:blank.", `<button class="btn" name="aboutBlank">Open</button>`)}
+        </section>
+        <section><h3>Tab</h3>
+          ${row("Disguise", "Makes this browser tab look like another site.", "")}
+          <div class="chips" data-cloaks></div>
+          ${row("Tab title", "Shown on the browser tab. Leave empty to use the disguise's title.", `<input class="field" name="cloakTitle">`)}
+          ${row("Favicon", "Icon shown on the browser tab. Paste an image URL, or leave empty to use the disguise's icon.", `<input class="field" name="cloakIcon" placeholder="https://…/favicon.ico">`)}
+        </section>
+        <section><h3>Tab redirect</h3>
+          ${row("Key", "Press it anywhere in GhettoOS to leave instantly. Ignored while typing in a text box.", `<input class="field key" name="panicKey" readonly placeholder="Click, then press a key"><button class="btn" name="clearPanic">Off</button>`)}
+          ${row("Redirect URL", "Where this tab goes when the key is pressed.", `<input class="field" name="panicUrl" placeholder="classroom.google.com">`)}
+          ${row("Reopen in about:blank", "Also reopens GhettoOS in a new about:blank tab, so you can get back to it.", toggle("panicBlank"))}
+        </section>
+        <section><h3>Browsing</h3>
+          ${row("Block ads", "Stops ads, pop-up tabs and trackers on sites you open through GhettoOS. Turn it off if a site breaks or won't load.", toggle("adblock"))}
+          ${row("Search engine", "Used when you type something that isn't an address.", `<select class="field" name="search"></select>`)}
+          ${row("Custom search URL", "Only used with “Custom…”. Put %s where the search words go.", `<input class="field" name="searchCustom" placeholder="https://example.com/search?q=%s">`)}
+        </section>
+        <section><h3>Appearance</h3>
+          ${row("Wallpaper", "Desktop background. All are drawn with CSS, so they use no extra memory.", `<div class="swatches" data-themes></div>`)}
+          ${row("Animated background", "Moving scenes that replace the wallpaper.", `<div class="seg" data-anims></div>`)}
+          ${row("Dock size", "Compact makes the dock icons smaller.", `<select class="field" name="layout"><option value="classic">Classic</option><option value="compact">Compact</option></select>`)}
+          ${row("Lock screen on start", "Shows the GhettoOS lock screen whenever the page opens.", toggle("lockOnStart"))}
+        </section>
+        <section><h3>Userscripts</h3>
+          ${row("Your scripts", "Run on matching sites you open through GhettoOS (Greasy Fork style, using the script's @match lines). Only add scripts you trust.", "")}
+          <div class="scripts" data-scripts></div>
+          <div class="row"><textarea class="field grow" name="usInput" rows="1" spellcheck="false" placeholder="Script URL (Greasy Fork, GitHub…) or paste the code"></textarea><button class="btn" name="usAdd">Add</button></div>
+          <div class="row-msg" data-usmsg></div>
+        </section>
+        <section><h3>Proxy</h3>
+          ${row("Engine", "Scramjet v2 works best. Only switch if sites won't load.", `<select class="field" name="engine"></select>`)}
+          ${row("Transport", "How proxied traffic reaches the internet.", `<select class="field" name="transport"></select>`)}
+          ${row("Wisp server", "Leave empty to use this server.", `<input class="field" name="wisp" placeholder="This server">`)}
+          ${row("Apply proxy changes", "Engine, transport and Wisp changes reload GhettoOS.", `<button class="btn primary" name="apply">Apply &amp; reload</button>`)}
+        </section>
+        <section><h3>Data</h3>
+          ${row("Visited sites", "Sites you've opened, suggested in the Browser's address bar. They stay on this device.", `<button class="btn danger" name="clearHistory">Clear visited sites</button>`)}
+          ${row("Site data", "Removes your settings, scripts, visited sites, and the cookies and logins of sites you've opened through GhettoOS.", `<button class="btn danger" name="clearAll">Clear all data</button>`)}
+        </section>
+      </div>`;
+      const $ = (n) => el.querySelector(`[name="${n}"]`);
+      const set = (k, v) => { settings[k] = v; saveSettings(); };
+      const fill = (sel, opts, value) => {
+        for (const [k, v] of Object.entries(opts)) sel.append(new Option(typeof v === "string" ? v : v.name, k));
+        sel.value = value;
+      };
+      const pressed = (buttons, isOn) => buttons.forEach(([id, b]) => b.setAttribute("aria-pressed", isOn(id)));
+
+      // Account
+      const renderAcct = () => {
+        if (!el.isConnected && onAccountChange.has(renderAcct)) return onAccountChange.delete(renderAcct); // window closed
+        el.querySelector("[data-acct-title]").textContent = account ? `Signed in as ${account}` : "Guest";
+        el.querySelector("[data-acct-desc]").textContent = account
+          ? "Your wallpaper, settings, scripts and favorite games are saved to your account and follow you to any device."
+          : "Settings only stay on this device. Sign in or create an account to save them and to use Chat.";
+        $("acctBtn").textContent = account ? "Sign out" : "Sign in";
+        $("acctBtn").className = account ? "btn danger" : "btn primary";
+      };
+      renderAcct();
+      onAccountChange.add(renderAcct);
+      $("acctBtn").onclick = () => (account ? signOut() : lockScreen());
+
+      // Toggles
+      for (const n of ["blurCloak", "panicBlank", "adblock", "lockOnStart"]) $(n).checked = !!settings[n];
+      $("lockOnStart").onchange = () => set("lockOnStart", $("lockOnStart").checked);
+      $("blurCloak").onchange = () => set("blurCloak", $("blurCloak").checked);
+      $("panicBlank").onchange = () => set("panicBlank", $("panicBlank").checked);
+      $("adblock").onchange = () => { set("adblock", $("adblock").checked); syncAdblock(); };
+
+      // Privacy
+      for (const c of CLOAKS) $("blurSite").append(new Option(c.name, c.id));
+      $("blurSite").value = coverSite().id;
+      $("blurSite").onchange = () => { set("blurSite", $("blurSite").value); };
+      $("aboutBlank").onclick = () => openAboutBlank();
+
+      // Tab disguise
+      const titleHint = () => ($("cloakTitle").placeholder = CLOAKS.find((c) => c.id === settings.cloak)?.title || ORIGINAL.title);
+      const cloakButtons = [{ id: "none", name: "Off (GhettoOS)", icon: GHETTO_ICON }, ...CLOAKS].map((c) => {
+        const b = document.createElement("button");
+        const img = document.createElement("img");
+        img.src = c.icon || iconFor(c.domain);
+        img.alt = "";
+        b.append(img, c.name);
+        b.onclick = () => { set("cloak", c.id); applyCloak(); titleHint(); pressed(cloakButtons, (id) => id === settings.cloak); };
+        el.querySelector("[data-cloaks]").append(b);
+        return [c.id, b];
+      });
+      pressed(cloakButtons, (id) => id === settings.cloak);
+      titleHint();
+      $("cloakTitle").value = settings.cloakTitle;
+      $("cloakIcon").value = settings.cloakIcon;
+      $("cloakTitle").oninput = () => { set("cloakTitle", $("cloakTitle").value); applyCloak(); };
+      $("cloakIcon").onchange = () => { set("cloakIcon", $("cloakIcon").value.trim()); applyCloak(); };
+
+      // Tab redirect
+      $("panicKey").value = settings.panicKey;
+      $("panicUrl").value = settings.panicUrl;
+      $("panicKey").addEventListener("keydown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === "Tab" || e.key === "Escape") return;
+        set("panicKey", e.key);
+        $("panicKey").value = e.key === " " ? "Space" : e.key;
+      });
+      $("clearPanic").onclick = () => { set("panicKey", ""); $("panicKey").value = ""; };
+      $("panicUrl").onchange = () => set("panicUrl", $("panicUrl").value.trim());
+
+      // Browsing
+      fill($("search"), SEARCH_ENGINES, settings.search);
+      $("searchCustom").value = settings.searchCustom;
+      $("search").onchange = () => set("search", $("search").value);
+      $("searchCustom").onchange = () => set("searchCustom", $("searchCustom").value.trim());
+
+      // Appearance
+      const themeButtons = Object.entries(THEMES).map(([id, t]) => {
+        const b = document.createElement("button");
+        b.style.background = t.bg;
+        b.title = b.ariaLabel = t.name;
+        b.onclick = () => { set("theme", id); set("animBg", "none"); applyAppearance(); markLook(); };
+        el.querySelector("[data-themes]").append(b);
+        return [id, b];
+      });
+      const animButtons = Object.entries(ANIM_BGS).map(([id, name]) => {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.onclick = () => { set("animBg", id); applyAppearance(); markLook(); };
+        el.querySelector("[data-anims]").append(b);
+        return [id, b];
+      });
+      const markLook = () => {
+        pressed(themeButtons, (id) => settings.animBg === "none" && id === settings.theme);
+        pressed(animButtons, (id) => id === settings.animBg);
+      };
+      markLook();
+      $("layout").value = settings.layout;
+      $("layout").onchange = () => { set("layout", $("layout").value); applyAppearance(); };
+
+      // Userscripts
+      const list = el.querySelector("[data-scripts]");
+      const msg = el.querySelector("[data-usmsg]");
+      const say = (text, isErr) => { msg.textContent = text; msg.classList.toggle("err", !!isErr); };
+      const renderScripts = () => {
+        list.replaceChildren(...userscripts.map((s) => {
+          const r = document.createElement("div");
+          r.className = "script";
+          r.innerHTML = `<div class="txt"><b></b><small></small></div>${toggle("enabled")}<button class="btn" data-remove>Remove</button>`;
+          r.querySelector("b").textContent = s.name;
+          r.querySelector("small").textContent = s.matches.length ? "Runs on " + s.matches.join(", ") : "Runs on every site";
+          const t = r.querySelector("input");
+          t.checked = s.enabled;
+          t.onchange = () => { s.enabled = t.checked; saveUserscripts(); };
+          r.querySelector("[data-remove]").onclick = () => {
+            userscripts = userscripts.filter((x) => x !== s);
+            saveUserscripts();
+            renderScripts();
+            say(`Removed “${s.name}”.`);
+          };
+          return r;
+        }));
+      };
+      renderScripts();
+      $("usAdd").onclick = async () => {
+        $("usAdd").disabled = true;
+        say("Adding…");
+        try {
+          const s = await addUserscript($("usInput").value);
+          $("usInput").value = "";
+          renderScripts();
+          say(`Added “${s.name}”. It runs the next time a matching site loads.`);
+        } catch (e) { say(e.message, true); }
+        $("usAdd").disabled = false;
+      };
+
+      // Proxy
+      fill($("engine"), ENGINES, settings.engine);
+      fill($("transport"), TRANSPORTS, settings.transport);
+      $("wisp").value = settings.wisp;
+      $("apply").onclick = () => {
+        settings.engine = $("engine").value;
+        settings.transport = $("transport").value;
+        settings.wisp = $("wisp").value.trim();
+        saveSettings();
+        location.reload();
+      };
+
+      // Data
+      $("clearHistory").onclick = () => { clearHistory(); $("clearHistory").textContent = "Cleared"; setTimeout(() => ($("clearHistory").textContent = "Clear visited sites"), 1500); };
+      $("clearAll").onclick = clearAllData;
+
+      openWindow("Settings", el, { width: Math.min(760, Math.round(innerWidth * 0.92)), height: Math.round((innerHeight - MENU_H - dockSpace()) * 0.94) });
+    }
+
+    // ======================= AI Chat =======================
+    // Duck.ai (free, no login) loaded through the proxy: its own headers forbid being framed
+    // directly (X-Frame-Options SAMEORIGIN, frame-ancestors duckduckgo.com).
+    // Its dock icon is the armillary-sphere engraving (public/assets/armillary.png).
+    const SPHERE = "/assets/armillary.png";
+
+    // ======================= Dock =======================
+    const GLYPHS = {
+      browser: `<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>`,
+      games: `<path d="M6 8.5h12a4 4 0 0 1 3.9 4.8l-.6 2.9a2.5 2.5 0 0 1-4.3 1.2L15 15.5H9l-2 1.9a2.5 2.5 0 0 1-4.3-1.2l-.6-2.9A4 4 0 0 1 6 8.5z"/><path d="M8 11v3M6.5 12.5h3"/><path d="M15.5 12h.01M17.5 13.5h.01"/>`,
+      settings: `<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>`,
+      chat: `<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-4.9A8.5 8.5 0 1 1 21 11.5z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/>`,
+      movies: `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/><path d="M10.5 10v4l3-2z"/>`,
+      inbox: `<path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 4h9.2a2 2 0 0 1 1.9 1.5L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/>`,
+      trophy: `<path d="M8 4h8v6a4 4 0 0 1-8 0z"/><path d="M8 6H5.5a2.5 2.5 0 0 0 2.5 4M16 6h2.5a2.5 2.5 0 0 1-2.5 4M12 14v4M8.5 20h7"/>`,
+      notepad: `<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14.5h7M9 18h4"/>`,
+      calculator: `<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 6.5h8v3.5H8z"/><path d="M8.5 13.5h.01M12 13.5h.01M15.5 13.5h.01M8.5 17h.01M12 17h.01M15.5 17h.01"/>`,
+      changelog: `<path d="M12 7.5v4.5l3 2"/><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5"/><path d="M3.5 4v4.5H8"/>`,
+      idea: `<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3z"/>`,
+    };
+    // Proxied sites open in app mode (no address bar).
+    const SHORTCUTS = [
+      { name: "AI Chat", url: "https://duck.ai/", domain: "duck.ai", sphere: true },
+      { name: "YouTube", url: "https://www.youtube.com", domain: "youtube.com" },
+      { name: "Spotify", url: "https://open.spotify.com", domain: "spotify.com" },
+      { name: "TikTok", url: "https://www.tiktok.com", domain: "tiktok.com" },
+      { name: "Instagram", url: "https://www.instagram.com", domain: "instagram.com" },
+      { name: "Twitch", url: "https://www.twitch.tv", domain: "twitch.tv" },
+      { name: "Discord", url: "https://discord.com/app", domain: "discord.com" },
+    ];
+    let DOCK_APPS = [
+      { name: "Browser", glyph: "browser", open: () => openBrowser() },
+      { name: "Games", glyph: "games", open: () => openGames() },
+      { name: "Settings", glyph: "settings", open: () => openSettings() },
+      { name: "Chat", glyph: "chat", open: () => openChat() },
+      null, // separator
+      ...SHORTCUTS.map((s) => ({ name: s.name, sphere: s.sphere, domain: s.domain,
+        open: () => (STATIC && s.sphere ? openAIChat() : openBrowser(s.url, { ...s, icon: s.sphere ? SPHERE : iconFor(s.domain) })) })),
+    ];
+    // Apps that need server.js (the proxy, or shared accounts) aren't shown in the static build.
+    const NEEDS_SERVER = new Set(["Browser", "Chat", "Movies", "Inbox", "Leaderboard", "Suggestions", ...SHORTCUTS.filter((s) => !s.sphere).map((s) => s.name)]);
+    const available = (a) => !a || !STATIC || !NEEDS_SERVER.has(a.name);
+    DOCK_APPS = DOCK_APPS.filter(available);
+    // Desktop only (not in the dock).
+    const MOVIES = { name: "Movies", url: "https://www.cineby.cx", domain: "cineby.cx" };
+    const DESKTOP_APPS = [
+      { name: "Movies", glyph: "movies", open: () => openBrowser(MOVIES.url, { ...MOVIES, icon: iconFor(MOVIES.domain) }) },
+      { name: "Inbox", glyph: "inbox", open: () => openInbox() },
+      { name: "Leaderboard", glyph: "trophy", open: () => openLeaderboard() },
+      { name: "Notepad", glyph: "notepad", open: () => openNotepad() },
+      { name: "Calculator", glyph: "calculator", open: () => openCalculator() },
+      { name: "Changelog", glyph: "changelog", open: () => openChangelog() },
+      { name: "Suggestions", glyph: "idea", open: () => openSuggestions() },
+    ];
+    const deskEls = {}; // app name -> desktop icon button
+    const dock = document.getElementById("dock");
+    const desktop = document.getElementById("desktop");
+    const dockItems = [];
+    function appTile(a) {
+      const tile = document.createElement("span");
+      if (a.glyph) {
+        tile.className = "tile native";
+        tile.innerHTML = `<svg viewBox="0 0 24 24">${GLYPHS[a.glyph]}</svg>`;
+      } else {
+        tile.className = a.sphere ? "tile sphere" : "tile site";
+        const img = document.createElement("img");
+        img.alt = "";
+        img.src = a.sphere ? SPHERE : iconFor(a.domain);
+        img.onerror = () => img.replaceWith(letterIcon(a.name));
+        tile.append(img);
+      }
+      return tile;
+    }
+    // Bring back / focus the app's newest window, or open one if it has none.
+    function launchApp(a) {
+      const mine = [...openWindows].filter((r) => r.app === a.name);
+      const r = mine[mine.length - 1];
+      if (!r) return a.open();
+      if (r.win.min) r.win.restore();
+      r.win.focus();
+    }
+    if (STATIC) document.querySelectorAll('#mb-menu [data-act="browser"], #mb-menu [data-act="chat"]').forEach((b) => b.remove());
+    for (const a of [...DOCK_APPS, ...DESKTOP_APPS.filter(available)]) {
+      if (!a) { dock.append(Object.assign(document.createElement("div"), { className: "dock-sep" })); continue; }
+      if (DOCK_APPS.includes(a)) {
+        const b = document.createElement("button");
+        b.className = "dock-item";
+        b.setAttribute("aria-label", a.name);
+        const tip = Object.assign(document.createElement("span"), { className: "tip", textContent: a.name });
+        b.append(appTile(a), tip);
+        b.onclick = () => launchApp(a);
+        dock.append(b);
+        dockItems.push({ app: a.name, el: b });
+      }
+      // Every app is also a desktop icon (dock apps stay in the dock too).
+      const d = document.createElement("button");
+      d.className = "desk-item";
+      d.title = a.name;
+      d.append(appTile(a), Object.assign(document.createElement("span"), { className: "label", textContent: a.name }));
+      d.onclick = () => launchApp(a);
+      desktop.append(d);
+      deskEls[a.name] = d;
+    }
+    function setDeskBadge(app, n) {
+      const d = deskEls[app];
+      let b = d?.querySelector(".badge");
+      if (!d) return;
+      if (!n) return b?.remove();
+      if (!b) d.append((b = Object.assign(document.createElement("span"), { className: "badge" })));
+      b.textContent = n > 99 ? "99+" : n;
+    }
+    function refreshDock() {
+      for (const it of dockItems) it.el.classList.toggle("running", [...openWindows].some((r) => r.app === it.app));
+    }
+    // Hover magnification: widths follow the pointer (positions measured at rest, so no feedback).
+    let restCenters = null, magFrame = 0, lastX = 0;
+    const iconSize = () => (settings.layout === "compact" || innerWidth <= 720 ? (innerWidth <= 720 ? 38 : 40) : 52);
+    function magnify() {
+      magFrame = 0;
+      const base = iconSize();
+      dockItems.forEach((it, i) => {
+        const d = Math.abs(lastX - restCenters[i]);
+        const s = 1 + 0.55 * Math.max(0, 1 - d / (base * 2.6)) ** 1.6;
+        it.el.style.width = it.el.style.height = (base * s).toFixed(1) + "px";
+      });
+    }
+    dock.addEventListener("mouseenter", () => {
+      restCenters = dockItems.map((it) => { const r = it.el.getBoundingClientRect(); return r.left + r.width / 2; });
+      dock.classList.add("magnify");
+    });
+    dock.addEventListener("mousemove", (e) => {
+      if (!restCenters) return;
+      lastX = e.clientX;
+      if (!magFrame) magFrame = requestAnimationFrame(magnify);
+    });
+    dock.addEventListener("mouseleave", () => {
+      cancelAnimationFrame(magFrame);
+      magFrame = 0;
+      restCenters = null;
+      dock.classList.remove("magnify");
+      dockItems.forEach((it) => (it.el.style.width = it.el.style.height = ""));
+    });
+
+    // ======================= Menu bar =======================
+    const mbMenu = document.getElementById("mb-menu");
+    const mbLogo = document.getElementById("mb-logo");
+    const toggleMenu = (open = mbMenu.hidden) => { mbMenu.hidden = !open; mbLogo.setAttribute("aria-expanded", open); };
+    mbLogo.onclick = (e) => { e.stopPropagation(); toggleMenu(); };
+    document.addEventListener("pointerdown", (e) => { if (!mbMenu.hidden && !mbMenu.contains(e.target) && !mbLogo.contains(e.target)) toggleMenu(false); });
+    mbMenu.onclick = (e) => {
+      const act = e.target.closest("button")?.dataset.act;
+      if (!act) return;
+      toggleMenu(false);
+      ({ about: openAbout, browser: () => openBrowser(), games: () => openGames(), settings: () => openSettings(), chat: () => openChat(),
+         blank: () => openAboutBlank(), account: () => (account ? signOut() : lockScreen()), lock: lockScreen })[act]();
+    };
+    document.getElementById("mb-lock").onclick = () => lockScreen();
+    function showUser() {
+      document.getElementById("mb-user").textContent = account || "Guest";
+      document.getElementById("mb-account").textContent = account ? `Sign out ${account}` : "Sign in…";
+    }
+
+    function openAbout() {
+      const el = document.createElement("div");
+      el.className = "app about";
+      el.innerHTML = `<img class="logo-img" alt=""><h2>GhettoOS</h2><p>Web desktop · Scramjet proxy · v${CHANGELOG[0].version}</p><img class="sphere" src="${SPHERE}" alt="">`;
+      el.querySelector(".logo-img").src = ORIGINAL.icon;
+      openWindow("About GhettoOS", el, { app: "About", width: 300, height: 340, x: "center", y: "center" });
+    }
+
+    // ======================= Lock screen =======================
+    // Background video: public/assets/lockscreen-bg.mp4, played as a boomerang between 0:03
+    // and 0:13. Forward is normal playback; backward steps currentTime once per frame, but
+    // only after the previous seek finished, so slow devices just get fewer frames.
+    const lockEl = document.getElementById("lock");
+    const lockVideo = document.getElementById("lock-video");
+    // The static build embeds the video only if it exists (window.GHETTO_LOCK_VIDEO).
+    const LOCK_VIDEO = STATIC ? window.GHETTO_LOCK_VIDEO || "" : "/assets/lockscreen-bg.mp4";
+    let loopA = 3, loopB = 13, reverse = false, boomFrame = 0, lastTs = 0;
+    function boomerang(ts) {
+      boomFrame = requestAnimationFrame(boomerang);
+      const v = lockVideo, dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;
+      lastTs = ts;
+      if (!reverse) {
+        if (v.currentTime >= loopB) { v.pause(); reverse = true; }
+      } else if (!v.seeking) {
+        const t = v.currentTime - dt * 1.0;
+        if (t <= loopA) { v.currentTime = loopA; reverse = false; v.play().catch(() => {}); }
+        else v.currentTime = t;
+      }
+    }
+    function startLockVideo() {
+      if (lockVideo.dataset.failed) return;
+      if (!LOCK_VIDEO) { lockVideo.hidden = true; return; }
+      if (!lockVideo.src) {
+        lockVideo.addEventListener("error", () => { lockVideo.dataset.failed = "1"; lockVideo.hidden = true; stopLockVideo(); }, { once: true });
+        lockVideo.addEventListener("loadedmetadata", () => {
+          const d = lockVideo.duration || 0;
+          loopB = Math.min(13, Math.max(0.5, d - 0.05));
+          loopA = Math.min(3, Math.max(0, loopB - 1));
+          lockVideo.currentTime = loopA;
+        }, { once: true });
+        lockVideo.src = LOCK_VIDEO;
+      }
+      reverse = false;
+      lastTs = 0;
+      lockVideo.play().catch(() => {});
+      cancelAnimationFrame(boomFrame);
+      boomFrame = requestAnimationFrame(boomerang);
+    }
+    function stopLockVideo() {
+      cancelAnimationFrame(boomFrame);
+      boomFrame = 0;
+      lockVideo.pause();
+    }
+    function tickClock() {
+      const now = new Date();
+      const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      document.getElementById("mb-time").textContent = time;
+      document.getElementById("mb-date").textContent = now.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+      document.getElementById("lock-time").textContent = time;
+      document.getElementById("lock-date").textContent = now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+    }
+    // ======================= Accounts =======================
+    // Guests: everything stays in this browser (localStorage). Signed in (accounts.js on the
+    // server, username + password, HttpOnly session cookie): settings, wallpaper, userscripts,
+    // favorite and played games are also saved to the account and loaded on any device.
+    // Static build: accounts live only in this browser. Passwords are kept as a salted
+    // PBKDF2 hash, and each account keeps its own saved settings ("prefs").
+    const LOCAL_ACCOUNTS_KEY = "ghettoos-local-accounts", LOCAL_SESSION_KEY = "ghettoos-local-session";
+    async function localApi(path, body, method) {
+      body ||= {};
+      const fail = (status, error) => { throw Object.assign(new Error(error), { status }); };
+      let db = {};
+      try { db = JSON.parse(localStorage.getItem(LOCAL_ACCOUNTS_KEY) || "{}") || {}; } catch {}
+      const save = () => { try { localStorage.setItem(LOCAL_ACCOUNTS_KEY, JSON.stringify(db)); } catch { fail(507, "Not enough storage space on this device."); } };
+      const k = (n) => String(n).toLowerCase();
+      const setSession = (n) => { try { n ? localStorage.setItem(LOCAL_SESSION_KEY, n) : localStorage.removeItem(LOCAL_SESSION_KEY); } catch {} };
+      const me = () => { try { return db[k(localStorage.getItem(LOCAL_SESSION_KEY) || "")] || null; } catch { return null; } };
+      const hash = async (password, salt) => {
+        if (!crypto.subtle) fail(500, "This browser can't create accounts on this page.");
+        const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+        const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 150000 }, key, 256);
+        return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      };
+      switch (`${method} ${path}`) {
+        case "GET /api/auth/me": return { name: me()?.name ?? null, admin: false };
+        case "POST /api/auth/register": {
+          const name = String(body.name || ""), password = String(body.password || "");
+          if (!/^[A-Za-z0-9_.-]{3,20}$/.test(name)) fail(400, "Usernames are 3–20 letters, numbers, dots, dashes or underscores.");
+          if (/^guest$/i.test(name)) fail(400, "That username is reserved.");
+          if (password.length < 6 || password.length > 200) fail(400, "Passwords need at least 6 characters.");
+          if (db[k(name)]) fail(409, "That username is already used on this device.");
+          const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+          db[k(name)] = { name, salt, hash: await hash(password, salt), prefs: null };
+          save();
+          setSession(name);
+          return { name };
+        }
+        case "POST /api/auth/login": {
+          const u = db[k(body.name || "")];
+          if (!u || (await hash(String(body.password || ""), u.salt)) !== u.hash) fail(401, "Wrong username or password.");
+          setSession(u.name);
+          return { name: u.name };
+        }
+        case "POST /api/auth/logout": setSession(null); return { ok: true };
+        case "GET /api/prefs": { const u = me() || fail(401, "Sign in first."); return { prefs: u.prefs }; }
+        case "PUT /api/prefs": { const u = me() || fail(401, "Sign in first."); u.prefs = body; save(); return { ok: true }; }
+      }
+      fail(503, "This needs the GhettoOS server, so it isn't available in this version.");
+    }
+    async function api(path, body, method = body ? "POST" : "GET") {
+      if (STATIC) return localApi(path, body, method);
+      const send = () => fetch(path, {
+        method,
+        headers: body ? { "content-type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let r;
+      try { r = await send(); }
+      catch {
+        // Network error (or a service-worker hiccup): try once more if repeating is harmless.
+        try {
+          if (method !== "GET" && path !== "/api/auth/login") throw 0;
+          await new Promise((ok) => setTimeout(ok, 600));
+          r = await send();
+        } catch { throw Object.assign(new Error("Can't reach GhettoOS."), { network: true }); }
+      }
+      let data = {};
+      try { data = await r.json(); } catch {}
+      if (!r.ok) {
+        // A missing /api route means the server is older than this page.
+        const msg = data.error || (r.status === 404 && path.startsWith("/api/") ? "This feature isn't available yet. The server needs a restart to get the latest update." : `Request failed (${r.status}).`);
+        throw Object.assign(new Error(msg), { status: r.status });
+      }
+      return data;
+    }
+    const SYNCED_SETTINGS = Object.keys(DEFAULTS).filter((k) => k !== "userName");
+    function collectPrefs() {
+      const s = {};
+      for (const k of SYNCED_SETTINGS) s[k] = settings[k];
+      return { v: 1, settings: s, userscripts, favorites: [...favorites], played, notes };
+    }
+    function queueSync() {
+      if (!account) return;
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => api("/api/prefs", collectPrefs(), "PUT").catch((e) => console.warn("Couldn't save settings to your account:", e.message)), 1000);
+    }
+    function writeLocal() {
+      try {
+        localStorage.setItem("proxyos-settings", JSON.stringify(settings));
+        localStorage.setItem(USERSCRIPTS_KEY, JSON.stringify(userscripts));
+        localStorage.setItem(FAV_KEY, JSON.stringify([...favorites]));
+        localStorage.setItem(PLAYED_KEY, JSON.stringify(played));
+        localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+      } catch {}
+    }
+    function applyPrefs(p) {
+      const s = p.settings || {};
+      const needsReload = ["engine", "transport", "wisp"].some((k) => k in s && s[k] !== settings[k]);
+      for (const k of SYNCED_SETTINGS) if (k in s) settings[k] = s[k];
+      if (Array.isArray(p.userscripts)) userscripts = p.userscripts;
+      if (Array.isArray(p.favorites)) favorites = new Set(p.favorites);
+      if (Array.isArray(p.played)) played = p.played;
+      if (Array.isArray(p.notes)) { notes = p.notes; notesChanged(); }
+      writeLocal();
+      if (needsReload) return location.reload(); // a different proxy engine needs a fresh start
+      applyAppearance();
+      applyCloak();
+      syncAdblock();
+    }
+    // Server copy wins. A brand-new account starts from whatever this device has set up.
+    async function loadAccountPrefs() {
+      const { prefs } = await api("/api/prefs");
+      if (prefs) applyPrefs(prefs);
+      else await api("/api/prefs", collectPrefs(), "PUT");
+    }
+    function setAccount(name) {
+      account = name || null;
+      showUser();
+      renderLock();
+      // One app failing to refresh must never break signing in.
+      for (const f of [...onAccountChange]) { try { f(); } catch (e) { console.error("account change:", e); } }
+    }
+    // Eye button that shows / hides a password field.
+    const EYE = `<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>`;
+    const EYE_OFF = `<path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.9 9.9 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>`;
+    function addEye(input) {
+      let wrap = input.parentElement;
+      if (!wrap.classList.contains("pill-wrap")) {
+        wrap = Object.assign(document.createElement("span"), { className: "eye-wrap" });
+        input.replaceWith(wrap);
+        wrap.append(input);
+      }
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "pass-eye" });
+      b.onmousedown = (e) => e.preventDefault(); // keep typing in the field
+      const show = (on) => {
+        input.type = on ? "text" : "password";
+        b.innerHTML = `<svg viewBox="0 0 24 24">${on ? EYE_OFF : EYE}</svg>`;
+        b.title = on ? "Hide password" : "Show password";
+        b.setAttribute("aria-label", b.title);
+        b.setAttribute("aria-pressed", on);
+      };
+      b.onclick = () => show(input.type === "password");
+      input.hidePassword = () => show(false);
+      show(false);
+      input.after(b);
+    }
+    function errText(err) {
+      if (err.network) return "Can't reach GhettoOS. Check your connection, or continue as guest.";
+      return err.status === undefined ? `Something went wrong: ${err.message}` : err.message;
+    }
+    async function signIn(name, password, create) {
+      const before = account;
+      const { name: signedIn } = await api(create ? "/api/auth/register" : "/api/auth/login", { name, password });
+      if (before && before.toLowerCase() !== signedIn.toLowerCase()) return location.reload(); // switched user
+      setAccount(signedIn);
+      if (!before) await loadAccountPrefs().catch((e) => console.warn("Couldn't load your settings:", e.message));
+    }
+    async function signOut() {
+      try { await api("/api/auth/logout", {}); } catch {}
+      // Don't leave this account's settings behind on a shared device.
+      for (const k of ["proxyos-settings", USERSCRIPTS_KEY, FAV_KEY, PLAYED_KEY, HISTORY_KEY, NOTES_KEY]) { try { localStorage.removeItem(k); } catch {} }
+      location.reload();
+    }
+
+    // ======================= Lock screen: sign in / create account / guest =======================
+    const $id = (id) => document.getElementById(id);
+    let lockMode = "signin"; // "signin" | "signup" (guests only)
+    function lockMsg(text, isErr) { $id("lock-msg").textContent = text || ""; $id("lock-msg").classList.toggle("err", !!isErr); }
+    function renderLock() {
+      const user = $id("lock-user"), pass = $id("lock-pass");
+      const signup = !account && lockMode === "signup";
+      user.readOnly = !!account;
+      if (account) user.value = account;
+      $id("lock-name").textContent = account ? "Welcome back" : signup ? "Create your account" : "GhettoOS";
+      pass.placeholder = signup ? "Choose a password (6+ characters)" : "Password";
+      pass.autocomplete = signup ? "new-password" : "current-password";
+      document.querySelector(".pill-go").title = account ? "Unlock" : signup ? "Create account" : "Sign in";
+      $id("lock-mode").textContent = account ? "Sign out" : signup ? "I already have an account" : "Create account";
+      $id("lock-guest").hidden = !!account;
+      $id("lock-guest").previousElementSibling.hidden = !!account;
+      lockMsg(account ? "Enter your password to unlock." : signup ? "Usernames are 3–20 letters, numbers, dots, dashes or underscores." : "");
+    }
+    $id("lock-mode").onclick = () => {
+      if (account) return signOut();
+      lockMode = lockMode === "signup" ? "signin" : "signup";
+      renderLock();
+      $id(($id("lock-user").value ? "lock-pass" : "lock-user")).focus();
+    };
+    $id("lock-guest").onclick = () => unlock();
+    $id("lock-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = account || $id("lock-user").value.trim(), pass = $id("lock-pass").value;
+      if (!name || !pass) return lockMsg(account ? "Enter your password." : "Enter a username and password, or continue as guest.", true);
+      const card = $id("lock-form");
+      card.classList.add("busy");
+      try {
+        await signIn(name, pass, !account && lockMode === "signup");
+        lockMode = "signin";
+        unlock();
+      } catch (err) {
+        console.error("sign in:", err);
+        lockMsg(errText(err), true);
+        $id("lock-pass").select();
+      } finally { card.classList.remove("busy"); }
+    });
+
+    // One-liners at the bottom of the lock screen: a random one each time, then a new one every 7 s.
+    const TAGLINES = ["in the gallows or the ghettos 👀", "un grr un que", "blue goo", "red goo", "green goo"];
+    let taglineIdx = -1, taglineTimer = 0;
+    function nextTagline() {
+      let i;
+      do { i = Math.floor(Math.random() * TAGLINES.length); } while (TAGLINES.length > 1 && i === taglineIdx);
+      taglineIdx = i;
+      const t = $id("tagline");
+      if (!t.textContent) { t.textContent = TAGLINES[i]; return; }
+      t.classList.add("out");
+      setTimeout(() => { t.textContent = TAGLINES[i]; t.classList.remove("out"); }, 500);
+    }
+
+    function lockScreen() {
+      lockEl.classList.remove("unlocking");
+      lockEl.hidden = false;
+      $id("lock-pass").value = "";
+      $id("lock-pass").hidePassword?.();
+      renderLock();
+      startLockVideo();
+      nextTagline();
+      clearInterval(taglineTimer);
+      taglineTimer = setInterval(nextTagline, 7000);
+      setTimeout(() => $id(account || $id("lock-user").value ? "lock-pass" : "lock-user").focus(), 50);
+    }
+    function unlock() {
+      lockEl.classList.add("unlocking");
+      stopLockVideo();
+      clearInterval(taglineTimer);
+      setTimeout(() => { lockEl.hidden = true; }, 450);
+    }
+
+    // ======================= Chat (one room for every signed-in user) =======================
+    // Messages arrive over Server-Sent Events (/api/chat/stream); EventSource reconnects by itself
+    // and the server resends anything missed (Last-Event-ID).
+    // Sign-in form shown inside account-only apps (Chat, Inbox).
+    function authPrompt(el, title, text) {
+      el.innerHTML = `<form class="auth-box">
+        <img class="logo-img" alt="">
+        <h2></h2>
+        <p></p>
+        <input name="u" placeholder="Username" maxlength="20" autocomplete="username" spellcheck="false" aria-label="Username">
+        <input name="p" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
+        <div class="msg" role="alert"></div>
+        <div class="row2"><button class="primary" type="submit">Sign in</button><button class="secondary" type="button" data-create>Create account</button></div>
+      </form>`;
+      const f = el.querySelector("form");
+      f.querySelector(".logo-img").src = ORIGINAL.icon;
+      f.querySelector("h2").textContent = title;
+      f.querySelector("p").textContent = text;
+      const go = async (create) => {
+        const u = f.u.value.trim(), p = f.p.value;
+        if (!u || !p) return (f.querySelector(".msg").textContent = "Enter a username and password.");
+        f.classList.add("busy");
+        try { await signIn(u, p, create); } // success re-renders through onAccountChange
+        catch (e) { console.error("sign in:", e); f.querySelector(".msg").textContent = errText(e); }
+        finally { f.classList.remove("busy"); }
+      };
+      f.onsubmit = (e) => { e.preventDefault(); go(false); };
+      f.querySelector("[data-create]").onclick = () => go(true);
+      addEye(f.p);
+      setTimeout(() => f.u.focus(), 50);
+    }
+
+    // ---- Small shared UI: toast, pop-up menu, emoji rows, message rows ----
+    const nameHue = (s) => { let h = 0; for (const c of s.toLowerCase()) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; };
+    function avatar(name, cls = "av") {
+      const a = Object.assign(document.createElement("span"), { className: cls, textContent: name[0].toUpperCase() });
+      a.style.background = `hsl(${nameHue(name)} 45% 38%)`;
+      return a;
+    }
+    let toastTimer = 0;
+    function toast(text) {
+      let t = document.querySelector(".toast");
+      if (!t) document.body.append((t = Object.assign(document.createElement("div"), { className: "toast", role: "status" })));
+      t.textContent = text;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.remove(), 2600);
+    }
+    let ctxEl = null, ctxOnClose = null;
+    function closeMenu() {
+      ctxEl?.remove();
+      ctxEl = null;
+      const f = ctxOnClose;
+      ctxOnClose = null;
+      f?.();
+    }
+    function showMenu(x, y, build, onClose) {
+      closeMenu();
+      const m = Object.assign(document.createElement("div"), { className: "ctx-menu", role: "menu" });
+      build(m);
+      document.body.append(m);
+      const r = m.getBoundingClientRect();
+      m.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 6)) + "px";
+      m.style.top = Math.max(6, Math.min(y, innerHeight - r.height - 6)) + "px";
+      ctxEl = m;
+      ctxOnClose = onClose;
+    }
+    document.addEventListener("pointerdown", (e) => { if (ctxEl && !ctxEl.contains(e.target)) closeMenu(); }, true);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ctxEl) closeMenu(); });
+    function menuItem(label, fn, cls = "") {
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "item " + cls, textContent: label });
+      b.onclick = () => { closeMenu(); fn(); };
+      return b;
+    }
+    const menuSep = () => document.createElement("hr");
+    const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+    const EMOJIS = ["😀", "😂", "🤣", "😊", "😍", "😎", "🤔", "😭", "😅", "😇", "🥺", "😤", "😡", "🤯", "😱", "😴",
+      "💀", "🤡", "🗿", "🫡", "👀", "👋", "👍", "👎", "👏", "🙏", "💪", "🤝", "🔥", "❤️", "💔", "✨",
+      "🎉", "💯", "✅", "❌", "⭐", "🎮", "🍕", "🎵"];
+    // A row of emoji buttons. keepOpen: picking doesn't close the menu (emoji picker).
+    function emojiRow(list, pick, { grid = false, keepOpen = false } = {}) {
+      const box = Object.assign(document.createElement("div"), { className: "emojis" + (grid ? " grid" : "") });
+      for (const emo of list) {
+        const b = Object.assign(document.createElement("button"), { type: "button", textContent: emo, title: emo });
+        b.onmousedown = (e) => e.preventDefault(); // keep focus in the text box
+        b.onclick = () => { if (!keepOpen) closeMenu(); pick(emo); };
+        box.append(b);
+      }
+      return box;
+    }
+    // Emoji picker for a text input (stays open so several can be added).
+    function emojiPicker(btn, input) {
+      const r = btn.getBoundingClientRect();
+      showMenu(r.left, r.top - 240, (m) => m.append(emojiRow(EMOJIS, (emo) => {
+        const s = input.selectionStart ?? input.value.length, e = input.selectionEnd ?? s;
+        if (input.value.length + emo.length > input.maxLength) return;
+        input.setRangeText(emo, s, e, "end");
+        input.focus();
+      }, { grid: true, keepOpen: true })));
+    }
+    // Avatar + name + time + text (Chat and Inbox). cont = same person a moment ago.
+    function msgRow(name, created, text, cont) {
+      const row = document.createElement("div");
+      row.className = "chat-msg" + (cont ? " cont" : "") + (name === account ? " mine" : "");
+      row.innerHTML = `<div class="body"><div class="who"><b></b><time></time></div><div class="text"></div><div class="reacts"></div></div>`;
+      row.prepend(avatar(name, "avatar"));
+      if (cont) row.querySelector(".who").remove();
+      else {
+        row.querySelector("b").textContent = name;
+        const t = new Date(created);
+        const time = row.querySelector("time");
+        time.textContent = t.toDateString() === new Date().toDateString()
+          ? t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : t.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        time.dateTime = t.toISOString();
+      }
+      row.querySelector(".text").textContent = text;
+      return row;
+    }
+
+    // ======================= Friends, blocks, unread DMs (signed in) =======================
+    // One SSE connection per signed-in page (/api/inbox/stream) keeps the Inbox badge and lists live.
+    const EMPTY_SOCIAL = { friends: [], incoming: [], outgoing: [], blocked: [] };
+    let social = EMPTY_SOCIAL, unread = {}, inboxES = null;
+    const socialBus = new EventTarget(); // events: "social", "dm" (ev.data; a listener sets ev.seen)
+    const lc = (s) => s.toLowerCase();
+    const isBlocked = (name) => social.blocked.some((n) => lc(n) === lc(name));
+    function updateInboxBadge() {
+      setDeskBadge("Inbox", Object.values(unread).reduce((a, b) => a + b, 0) + social.incoming.length);
+    }
+    function socialChanged(next) {
+      social = next;
+      socialBus.dispatchEvent(new Event("social"));
+      updateInboxBadge();
+    }
+    const refreshSocial = () => account && api("/api/social").then(socialChanged, () => {});
+    async function socialAct(action, name) {
+      try { socialChanged(await api("/api/social", { action, name })); return true; }
+      catch (e) { toast(e.message); return false; }
+    }
+    function connectInbox() {
+      inboxES?.close();
+      inboxES = null;
+      unread = {};
+      socialChanged(EMPTY_SOCIAL);
+      if (!account || STATIC) return;
+      refreshSocial();
+      inboxES = new EventSource("/api/inbox/stream");
+      inboxES.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        if (d.type === "unread") { unread = d.unread; updateInboxBadge(); }
+        else if (d.type === "social") refreshSocial();
+        else if (d.type === "dm") {
+          const ev = Object.assign(new Event("dm"), { data: d, seen: false });
+          socialBus.dispatchEvent(ev);
+          if (lc(d.from) !== lc(account) && !ev.seen) { unread[d.from] = (unread[d.from] || 0) + 1; updateInboxBadge(); toast(`💬 ${d.from}: ${d.text}`.slice(0, 90)); }
+        }
+      };
+    }
+    onAccountChange.add(connectInbox);
+    // "Add friend" menu item that matches where you stand with them.
+    function friendItem(name) {
+      const has = (list) => list.some((n) => lc(n) === lc(name));
+      if (has(social.friends)) return Object.assign(menuItem("✓ Friends", () => {}), { disabled: true });
+      if (has(social.outgoing)) return Object.assign(menuItem("Friend request sent", () => {}), { disabled: true });
+      return menuItem(has(social.incoming) ? "Accept friend request" : "Add friend", async () => {
+        if (await socialAct("add", name)) toast(social.friends.some((n) => lc(n) === lc(name)) ? `You and ${name} are friends now` : `Friend request sent to ${name}`);
+      });
+    }
+    async function confirmBlock(name) {
+      if (!confirm(`Block ${name}?\n\nYou won't see their chat messages, and they can't message you or add you. You can unblock them in Inbox.`)) return;
+      if (await socialAct("block", name)) toast(`Blocked ${name}`);
+    }
+
+    // Time on GhettoOS: a heartbeat every minute while the page is visible (signed in only).
+    function beat() { if (account && !STATIC && !document.hidden) return api("/api/activity", {}).catch(() => {}); }
+    setInterval(beat, 60e3);
+    onAccountChange.add(beat);
+
+    function openChat() {
+      const el = document.createElement("div");
+      el.className = "app chat-app";
+      let es = null, offSocial = null;
+      const stop = () => { es?.close(); es = null; offSocial?.(); offSocial = null; };
+      const render = () => {
+        stop();
+        if (!el.isConnected && onAccountChange.has(render)) return onAccountChange.delete(render); // window closed
+        account ? renderRoom() : authPrompt(el, "Sign in to chat", "Chat is shared by everyone on GhettoOS. Sign in, or create an account with a username and password.");
+      };
+
+      function renderRoom() {
+        el.innerHTML = `<div class="chat-top"><b># everyone</b><span class="online">connecting…</span></div>
+          <div class="chat-log" aria-live="polite"><div class="chat-empty">Loading messages…</div></div>
+          <div class="chat-note" role="alert"></div>
+          <div class="chat-reply" hidden><span></span><button type="button" title="Cancel reply" aria-label="Cancel reply">✕</button></div>
+          <form class="chat-send"><button type="button" class="emoji-btn" title="Emoji" aria-label="Add emoji">🙂</button><input maxlength="500" placeholder="Message everyone" aria-label="Message"><button type="submit">Send</button></form>`;
+        const log = el.querySelector(".chat-log"), note = el.querySelector(".chat-note"), online = el.querySelector(".online");
+        const form = el.querySelector("form"), input = form.querySelector("input"), sendBtn = form.querySelector('[type="submit"]');
+        const replyBar = el.querySelector(".chat-reply");
+        const byId = new Map(); // id -> { m, row }
+        let last = null, replyTo = null;
+        form.querySelector(".emoji-btn").onclick = (e) => emojiPicker(e.currentTarget, input);
+
+        function setReply(m) {
+          replyTo = m;
+          replyBar.hidden = !m;
+          if (!m) return;
+          const s = replyBar.querySelector("span");
+          s.innerHTML = "Replying to <b></b>: ";
+          s.querySelector("b").textContent = m.name;
+          s.append(m.text);
+          input.focus();
+        }
+        replyBar.querySelector("button").onclick = () => setReply(null);
+        const hideBlocked = (row) => row.classList.toggle("blocked", isBlocked(row.dataset.name));
+        const onSocial = () => log.querySelectorAll(".chat-msg").forEach(hideBlocked);
+        socialBus.addEventListener("social", onSocial);
+        offSocial = () => socialBus.removeEventListener("social", onSocial);
+
+        const react = (id, emoji) => api("/api/chat/react", { id, emoji }).catch((e) => (note.textContent = e.message));
+        function setReactions(id, reactions) {
+          const it = byId.get(id);
+          if (!it) return;
+          it.m.reactions = reactions;
+          const box = it.row.querySelector(".reacts");
+          box.textContent = "";
+          for (const [emo, names] of Object.entries(reactions)) {
+            const b = Object.assign(document.createElement("button"), { type: "button", textContent: `${emo} ${names.length}`, title: names.join(", ") });
+            if (names.includes(account)) b.className = "on";
+            b.onclick = () => react(id, emo);
+            box.append(b);
+          }
+        }
+        function jumpTo(id) {
+          const it = byId.get(id);
+          if (!it) return toast("That message is too old to show here.");
+          it.row.scrollIntoView({ block: "center", behavior: "smooth" });
+          it.row.classList.add("flash");
+          setTimeout(() => it.row.classList.remove("flash"), 1200);
+        }
+        function msgMenu(m, row, x, y) {
+          row.classList.add("menu-open");
+          showMenu(x, y, (menu) => {
+            menu.append(emojiRow(REACTIONS, (emo) => react(m.id, emo)), menuSep(),
+              menuItem("↩  Reply", () => setReply(m)),
+              menuItem("Copy text", () => navigator.clipboard?.writeText(m.text).catch(() => {})));
+            if (lc(m.name) !== lc(account)) menu.append(menuSep(), friendItem(m.name), menuItem(`Block ${m.name}`, () => confirmBlock(m.name), "danger"));
+          }, () => row.classList.remove("menu-open"));
+        }
+        function addMsg(m) {
+          if (byId.has(m.id)) return;
+          log.querySelector(".chat-empty")?.remove();
+          const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+          const cont = last && last.name === m.name && m.created - last.created < 5 * 60e3 && !m.reply;
+          const row = msgRow(m.name, m.created, m.text, cont);
+          row.dataset.name = m.name;
+          if (m.reply) {
+            const q = Object.assign(document.createElement("button"), { type: "button", className: "quote", title: "Show the original message" });
+            q.innerHTML = "↪ <b></b> ";
+            q.querySelector("b").textContent = m.reply.name;
+            q.append(m.reply.text);
+            q.onclick = () => jumpTo(m.reply.id);
+            row.querySelector(".text").before(q);
+          }
+          const acts = Object.assign(document.createElement("div"), { className: "acts" });
+          acts.innerHTML = `<button type="button" data-a="react" title="React" aria-label="React">🙂</button><button type="button" data-a="reply" title="Reply" aria-label="Reply">↩</button><button type="button" data-a="more" title="More" aria-label="More">⋯</button>`;
+          acts.querySelector('[data-a="react"]').onclick = (e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            row.classList.add("menu-open");
+            showMenu(r.left - 90, r.bottom + 4, (menu) => menu.append(emojiRow(REACTIONS, (emo) => react(m.id, emo))), () => row.classList.remove("menu-open"));
+          };
+          acts.querySelector('[data-a="reply"]').onclick = () => setReply(m);
+          acts.querySelector('[data-a="more"]').onclick = (e) => { const r = e.currentTarget.getBoundingClientRect(); msgMenu(m, row, r.right - 190, r.bottom + 4); };
+          row.append(acts);
+          row.oncontextmenu = (e) => { e.preventDefault(); msgMenu(m, row, e.clientX, e.clientY); };
+          hideBlocked(row);
+          log.append(row);
+          byId.set(m.id, { m, row });
+          setReactions(m.id, m.reactions || {});
+          last = m;
+          if (stick || m.name === account) log.scrollTop = log.scrollHeight;
+        }
+        es = new EventSource("/api/chat/stream");
+        es.onopen = () => { note.textContent = ""; };
+        es.onmessage = (e) => {
+          const d = JSON.parse(e.data);
+          if (d.type === "msg") addMsg(d);
+          else if (d.type === "react") setReactions(d.id, d.reactions);
+          else if (d.type === "online") {
+            online.textContent = `${d.names.length} online`;
+            online.title = d.names.join(", ");
+            const empty = log.querySelector(".chat-empty");
+            if (empty) empty.textContent = "No messages yet. Say hi 👋";
+          }
+        };
+        es.onerror = () => {
+          if (es?.readyState === EventSource.CLOSED) { // server refused: probably signed out elsewhere
+            api("/api/auth/me").then(({ name }) => { if (!name) setAccount(null); else note.textContent = "Chat disconnected. Close and reopen it to retry."; }).catch(() => {});
+          } else note.textContent = "Reconnecting…";
+        };
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          const text = input.value.trim();
+          if (!text) return;
+          sendBtn.disabled = true;
+          try { await api("/api/chat/send", { text, replyTo: replyTo?.id ?? null }); input.value = ""; note.textContent = ""; setReply(null); }
+          catch (err) { note.textContent = err.status === 401 ? "Your session ended. Sign in again." : err.message; if (err.status === 401) setAccount(null); }
+          finally { sendBtn.disabled = false; input.focus(); }
+        };
+        setTimeout(() => input.focus(), 50);
+      }
+
+      openWindow("Chat", el, {
+        app: "Chat",
+        width: Math.min(520, Math.round(innerWidth * 0.9)),
+        height: Math.round((innerHeight - MENU_H - dockSpace()) * 0.85),
+        onclose: () => { stop(); onAccountChange.delete(render); },
+      });
+      onAccountChange.add(render);
+      render();
+    }
+
+    const appHeight = (f) => Math.round((innerHeight - MENU_H - dockSpace()) * f);
+
+    // ======================= Inbox (friends + direct messages) =======================
+    function openInbox() {
+      const el = document.createElement("div");
+      el.className = "app";
+      let sel = null, offs = [];
+      const cleanup = () => { offs.forEach((f) => f()); offs = []; };
+      const on = (type, fn) => { socialBus.addEventListener(type, fn); offs.push(() => socialBus.removeEventListener(type, fn)); };
+      const render = () => {
+        cleanup();
+        if (!el.isConnected && onAccountChange.has(render)) return onAccountChange.delete(render);
+        sel = null;
+        if (!account) { el.className = "app"; return authPrompt(el, "Sign in to use Inbox", "Add friends and message them privately. Sign in, or create an account."); }
+        el.className = "app inbox";
+        renderInbox();
+      };
+
+      function renderInbox() {
+        el.innerHTML = `<div class="inbox-side">
+            <form class="inbox-add"><input class="ginput" placeholder="Add by username" maxlength="20" spellcheck="false" aria-label="Username to add"><button class="gbtn primary">Add</button></form>
+            <div class="inbox-msg" role="status"></div>
+            <div class="lists"></div>
+          </div>
+          <div class="inbox-main"></div>`;
+        const side = el.querySelector(".lists"), main = el.querySelector(".inbox-main"), msg = el.querySelector(".inbox-msg");
+        const addForm = el.querySelector(".inbox-add"), addInput = addForm.querySelector("input");
+        const say = (t, err) => { msg.textContent = t; msg.classList.toggle("err", !!err); };
+        addForm.onsubmit = async (e) => {
+          e.preventDefault();
+          const name = addInput.value.trim();
+          if (!name) return;
+          try {
+            socialChanged(await api("/api/social", { action: "add", name }));
+            addInput.value = "";
+            const friend = social.friends.find((n) => lc(n) === lc(name));
+            say(friend ? `You and ${friend} are friends now.` : `Friend request sent.`);
+          } catch (err) { say(err.message, true); }
+        };
+
+        function section(title, names, build) {
+          const h = Object.assign(document.createElement("h4"), { textContent: title });
+          side.append(h);
+          if (!names.length) return side.append(Object.assign(document.createElement("div"), { className: "none", textContent: title === "Friends" ? "No friends yet." : "None" }));
+          for (const n of names) side.append(build(n));
+        }
+        const mini = (label, fn, cls = "") => {
+          const b = Object.assign(document.createElement("button"), { type: "button", className: "mini " + cls, textContent: label });
+          b.onclick = (e) => { e.stopPropagation(); fn(); };
+          return b;
+        };
+        const person = (name, tag = "div") => {
+          const p = Object.assign(document.createElement(tag), { className: "person" });
+          if (tag === "button") p.type = "button";
+          p.append(avatar(name, "av sm"), Object.assign(document.createElement("span"), { className: "nm", textContent: name }));
+          return p;
+        };
+        function drawLists() {
+          side.textContent = "";
+          if (social.incoming.length) section("Friend requests", social.incoming, (n) => {
+            const p = person(n);
+            p.append(mini("Accept", () => socialAct("add", n), "ok"), mini("✕", () => socialAct("remove", n)));
+            return p;
+          });
+          section("Friends", social.friends, (n) => {
+            const p = person(n, "button");
+            if (sel && lc(sel) === lc(n)) p.classList.add("sel");
+            if (unread[n]) p.append(Object.assign(document.createElement("span"), { className: "badge", textContent: unread[n] }));
+            p.onclick = () => openThread(n);
+            p.oncontextmenu = (e) => { e.preventDefault(); friendMenu(n, e.clientX, e.clientY); };
+            return p;
+          });
+          if (social.outgoing.length) section("Sent requests", social.outgoing, (n) => {
+            const p = person(n);
+            p.append(mini("Cancel", () => socialAct("remove", n)));
+            return p;
+          });
+          if (social.blocked.length) section("Blocked", social.blocked, (n) => {
+            const p = person(n);
+            p.append(mini("Unblock", () => socialAct("unblock", n)));
+            return p;
+          });
+        }
+        function friendMenu(n, x, y) {
+          showMenu(x, y, (m) => m.append(
+            menuItem("Message", () => openThread(n)),
+            menuItem("Remove friend", () => { if (confirm(`Remove ${n} from your friends?`)) socialAct("remove", n); }),
+            menuSep(),
+            menuItem(`Block ${n}`, () => confirmBlock(n), "danger")));
+        }
+        function showEmpty() {
+          sel = null;
+          main.innerHTML = `<div class="inbox-empty">Pick a friend to start chatting.<br><br>Add people by username on the left,<br>or right-click someone's message in Chat.</div>`;
+        }
+
+        let threadIds = new Set(), last = null, log = null;
+        function addDm(m) {
+          if (threadIds.has(m.id)) return;
+          threadIds.add(m.id);
+          log.querySelector(".chat-empty")?.remove();
+          const cont = last && last.from === m.from && m.created - last.created < 5 * 60e3;
+          log.append(msgRow(m.from, m.created, m.text, cont));
+          last = m;
+          log.scrollTop = log.scrollHeight;
+        }
+        async function openThread(name) {
+          sel = name;
+          threadIds = new Set();
+          last = null;
+          main.innerHTML = `<div class="chat-top"><b></b><button type="button" class="gbtn" style="margin-left:auto" title="More">⋯</button></div>
+            <div class="chat-log"><div class="chat-empty">Loading…</div></div>
+            <div class="chat-note" role="alert"></div>
+            <form class="chat-send"><button type="button" class="emoji-btn" title="Emoji" aria-label="Add emoji">🙂</button><input maxlength="500" aria-label="Message"><button type="submit">Send</button></form>`;
+          const top = main.querySelector(".chat-top");
+          top.prepend(avatar(name, "av sm"));
+          top.querySelector("b").textContent = name;
+          top.querySelector(".gbtn").onclick = (e) => { const r = e.currentTarget.getBoundingClientRect(); friendMenu(name, r.right - 190, r.bottom + 4); };
+          log = main.querySelector(".chat-log");
+          const note = main.querySelector(".chat-note"), form = main.querySelector("form"), input = form.querySelector("input"), sendBtn = form.querySelector('[type="submit"]');
+          input.placeholder = `Message ${name}`;
+          form.querySelector(".emoji-btn").onclick = (e) => emojiPicker(e.currentTarget, input);
+          delete unread[name];
+          updateInboxBadge();
+          drawLists();
+          form.onsubmit = async (e) => {
+            e.preventDefault();
+            const text = input.value.trim();
+            if (!text) return;
+            sendBtn.disabled = true;
+            try { await api("/api/dm", { to: name, text }); input.value = ""; note.textContent = ""; }
+            catch (err) { note.textContent = err.message; }
+            finally { sendBtn.disabled = false; input.focus(); }
+          };
+          setTimeout(() => input.focus(), 50);
+          try {
+            const { messages } = await api(`/api/dm?with=${encodeURIComponent(name)}`);
+            if (sel !== name) return;
+            if (!messages.length) log.querySelector(".chat-empty").textContent = `This is the start of your messages with ${name}. Say hi 👋`;
+            messages.forEach(addDm);
+          } catch (err) { note.textContent = err.message; }
+        }
+
+        on("social", () => {
+          drawLists();
+          if (sel && !social.friends.some((n) => lc(n) === lc(sel))) showEmpty(); // unfriended / blocked
+        });
+        on("dm", (ev) => {
+          const d = ev.data, other = lc(d.from) === lc(account) ? d.to : d.from;
+          if (!sel || lc(other) !== lc(sel) || !log) return drawLists();
+          addDm(d);
+          if (lc(d.from) !== lc(account)) { ev.seen = true; api("/api/dm/read", { with: other }).catch(() => {}); }
+        });
+        drawLists();
+        showEmpty();
+        refreshSocial();
+      }
+
+      openWindow("Inbox", el, { app: "Inbox", width: Math.min(720, Math.round(innerWidth * 0.92)), height: appHeight(0.85), onclose: () => { cleanup(); onAccountChange.delete(render); } });
+      onAccountChange.add(render);
+      render();
+    }
+
+    // ======================= Leaderboard (day streaks + time spent) =======================
+    const fmtDuration = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return s < 60 ? "<1m" : h ? `${h}h ${m}m` : `${m}m`; };
+    function openLeaderboard() {
+      const el = document.createElement("div");
+      el.className = "app";
+      el.innerHTML = `<div class="lb-head"><div class="seg"><button type="button" data-t="streak" class="on">🔥 Day streak</button><button type="button" data-t="time">⏱ Time spent</button></div><button type="button" class="gbtn" data-r>Refresh</button></div>
+        <div class="lb-me"></div>
+        <ol class="lb-list"><li class="lb-note">Loading…</li></ol>`;
+      const me = el.querySelector(".lb-me"), list = el.querySelector(".lb-list");
+      let tab = "streak", data = null;
+      el.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => {
+        tab = b.dataset.t;
+        el.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b));
+        draw();
+      }));
+      function draw() {
+        if (!data) return;
+        if (account && data.me) me.innerHTML = `<div><b>${data.me.streak}</b>day streak</div><div><b>${data.me.best}</b>best streak</div><div><b>${fmtDuration(data.me.seconds)}</b>time on GhettoOS</div>`;
+        else me.textContent = account ? "Your stats show up after your first minute online." : "Sign in to get on the leaderboard. Come back every day to grow your streak!";
+        const rows = tab === "streak" ? data.streak : data.time;
+        list.textContent = "";
+        if (!rows.length) return list.append(Object.assign(document.createElement("li"), { className: "lb-note", textContent: "Nobody here yet. Be the first!" }));
+        rows.forEach((r, i) => {
+          const li = document.createElement("li");
+          if (account && lc(r.name) === lc(account)) li.className = "me";
+          const rank = Object.assign(document.createElement("span"), { className: "rank" + (i < 3 ? " medal" : ""), textContent: i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1 });
+          const val = Object.assign(document.createElement("span"), { className: "val" });
+          if (tab === "streak") {
+            val.textContent = `${r.streak} day${r.streak === 1 ? "" : "s"}`;
+            val.append(Object.assign(document.createElement("span"), { className: "sub", textContent: `best ${r.best}` }));
+          } else val.textContent = fmtDuration(r.seconds);
+          li.append(rank, avatar(r.name, "av sm"), Object.assign(document.createElement("span"), { className: "nm", textContent: r.name }), val);
+          list.append(li);
+        });
+      }
+      async function load() {
+        try { await beat(); data = await api("/api/leaderboard"); draw(); }
+        catch (e) { list.innerHTML = ""; list.append(Object.assign(document.createElement("li"), { className: "lb-note", textContent: e.status === undefined ? "Can't reach GhettoOS right now." : e.message })); }
+      }
+      el.querySelector("[data-r]").onclick = load;
+      const onAcct = () => (el.isConnected ? load() : onAccountChange.delete(onAcct));
+      onAccountChange.add(onAcct);
+      openWindow("Leaderboard", el, { app: "Leaderboard", width: Math.min(460, Math.round(innerWidth * 0.92)), height: appHeight(0.85), onclose: () => onAccountChange.delete(onAcct) });
+      load();
+    }
+
+    // ======================= Calculator =======================
+    function openCalculator() {
+      const el = document.createElement("div");
+      el.className = "app calc";
+      el.tabIndex = 0;
+      el.innerHTML = `<div class="calc-expr"></div><div class="calc-display">0</div><div class="calc-keys">
+        <button class="fn" data-k="C">AC</button><button class="fn" data-k="±">±</button><button class="fn" data-k="%">%</button><button class="op" data-k="/">÷</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button class="op" data-k="*">×</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button class="op" data-k="-">−</button>
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button class="op" data-k="+">+</button>
+        <button class="zero" data-k="0">0</button><button data-k=".">.</button><button class="op" data-k="=">=</button></div>`;
+      const disp = el.querySelector(".calc-display"), exprEl = el.querySelector(".calc-expr");
+      const SYM = { "/": "÷", "*": "×", "-": "−", "+": "+" };
+      let cur = "0", acc = null, op = null, fresh = true, expr = "";
+      const calc = (a, b, o) => (o === "+" ? a + b : o === "-" ? a - b : o === "*" ? a * b : b === 0 ? NaN : a / b);
+      const fmt = (n) => (Number.isFinite(n) ? String(parseFloat(n.toPrecision(12))) : "Error");
+      function press(k) {
+        if (/^\d$/.test(k)) { if (fresh || cur === "0" || cur === "Error") cur = k; else if (cur.replace(/[-.]/g, "").length < 15) cur += k; fresh = false; expr = op ? expr : ""; }
+        else if (k === ".") { if (fresh || cur === "Error") { cur = "0."; fresh = false; } else if (!cur.includes(".")) cur += "."; }
+        else if (k === "C") { cur = "0"; acc = null; op = null; fresh = true; expr = ""; }
+        else if (k === "±") { if (cur !== "0" && cur !== "Error") cur = cur.startsWith("-") ? cur.slice(1) : "-" + cur; }
+        else if (k === "%") { cur = fmt(parseFloat(cur) / 100); fresh = true; }
+        else if (k === "Backspace") { if (!fresh) { cur = cur.slice(0, -1); if (cur === "" || cur === "-") cur = "0"; } }
+        else if (k in SYM) {
+          if (op && !fresh) { acc = calc(acc, parseFloat(cur), op); cur = fmt(acc); }
+          else if (!op) acc = parseFloat(cur);
+          op = k; fresh = true;
+          expr = `${fmt(acc)} ${SYM[op]}`;
+        } else if (k === "=") {
+          if (!op) return;
+          const b = parseFloat(cur);
+          expr = `${fmt(acc)} ${SYM[op]} ${fmt(b)} =`;
+          cur = fmt(calc(acc, b, op));
+          acc = null; op = null; fresh = true;
+        }
+        disp.textContent = cur;
+        exprEl.textContent = expr;
+        el.querySelectorAll(".op").forEach((b) => b.classList.toggle("on", b.dataset.k === op && fresh));
+      }
+      el.querySelector(".calc-keys").onclick = (e) => { const k = e.target.closest("button")?.dataset.k; if (k) press(k); };
+      el.onkeydown = (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const k = { Enter: "=", "=": "=", Escape: "C", Delete: "C", ",": ".", x: "*", X: "*" }[e.key] ?? e.key;
+        if (/^[\d.%+\-*/=C]$|^Backspace$/.test(k)) { e.preventDefault(); press(k); }
+      };
+      openWindow("Calculator", el, { app: "Calculator", width: 300, height: 460 });
+      setTimeout(() => el.focus(), 50);
+    }
+
+    // ======================= Notepad =======================
+    function openNotepad() {
+      const el = document.createElement("div");
+      el.className = "app notes";
+      el.innerHTML = `<div class="notes-side"><div class="notes-bar"><button type="button" class="gbtn primary" data-new>+ New</button><button type="button" class="gbtn danger" data-del>Delete</button></div><div class="notes-list"></div></div>
+        <textarea placeholder="Start typing…" aria-label="Note"></textarea>`;
+      const list = el.querySelector(".notes-list"), ta = el.querySelector("textarea");
+      let selId = null, timer = 0, dirty = false;
+      const titleOf = (n) => (n.text.trim().split("\n")[0] || "New note").slice(0, 80);
+      const flush = () => { clearTimeout(timer); if (dirty) { dirty = false; saveNotes(); } };
+      function drawList() {
+        list.textContent = "";
+        for (const n of [...notes].sort((a, b) => b.updated - a.updated)) {
+          const b = Object.assign(document.createElement("button"), { type: "button", className: "note-item" + (n.id === selId ? " sel" : "") });
+          b.append(Object.assign(document.createElement("b"), { textContent: titleOf(n) }),
+            Object.assign(document.createElement("small"), { textContent: new Date(n.updated).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) }));
+          b.onclick = () => { flush(); select(n.id); };
+          list.append(b);
+        }
+      }
+      function select(id) {
+        selId = notes.some((n) => n.id === id) ? id : null;
+        ta.value = notes.find((n) => n.id === selId)?.text ?? "";
+        drawList();
+      }
+      function newNote() {
+        flush();
+        const n = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text: "", updated: Date.now() };
+        notes.push(n);
+        select(n.id);
+        ta.focus();
+      }
+      ta.oninput = () => {
+        let n = notes.find((x) => x.id === selId);
+        if (!n) { notes.push((n = { id: Date.now().toString(36), text: "", updated: 0 })); selId = n.id; }
+        n.text = ta.value;
+        n.updated = Date.now();
+        dirty = true;
+        clearTimeout(timer);
+        timer = setTimeout(flush, 500);
+        drawList();
+      };
+      el.querySelector("[data-new]").onclick = newNote;
+      el.querySelector("[data-del]").onclick = () => {
+        const n = notes.find((x) => x.id === selId);
+        if (!n || (n.text.trim() && !confirm(`Delete “${titleOf(n)}”?`))) return;
+        notes = notes.filter((x) => x !== n);
+        dirty = true;
+        flush();
+        select([...notes].sort((a, b) => b.updated - a.updated)[0]?.id);
+      };
+      notesRender = () => select(selId);
+      openWindow("Notepad", el, { app: "Notepad", width: Math.min(680, Math.round(innerWidth * 0.92)), height: Math.min(480, appHeight(0.85)),
+        onclose: () => { flush(); notesRender = null; } });
+      select([...notes].sort((a, b) => b.updated - a.updated)[0]?.id);
+      setTimeout(() => ta.focus(), 50);
+    }
+
+    // ======================= Changelog =======================
+    // Newest first. Add an entry for every major update (CHANGELOG[0].version is shown in About).
+    // Users read this: keep it short and high-level. No technical internals, no names of
+    // outside sites or services, nothing about hiding or getting around anything.
+    const CHANGELOG = [
+      {
+        version: "1.0.0", date: "2026-11-19", title: "First release",
+        groups: [
+          ["Desktop", [
+            "A brand-new desktop with a lock screen, menu bar, dock and movable windows.",
+            "Every app is now on the desktop as well as in the dock.",
+            "Wallpapers and themes to make it your own.",
+          ]],
+          ["Apps", [
+            "Browser, Games, Chat, Inbox, Leaderboard, Calculator, Notepad and more.",
+            "Your favorite sites open in their own app windows.",
+            "Games: a large library with search, favorites and full screen.",
+          ]],
+          ["Accounts", [
+            "Create an account to keep your settings, favorites and notes on any device, or continue as a guest.",
+            "Make friends and send them private messages in Inbox.",
+            "Reply to and react to messages in Chat.",
+            "Leaderboard: daily streaks and time spent.",
+          ]],
+          ["Feedback", [
+            "Have an idea or found a bug? Send it with the Suggestions app.",
+          ]],
+        ],
+      },
+    ];
+    function openChangelog() {
+      const el = document.createElement("div");
+      el.className = "app changelog";
+      for (const rel of CHANGELOG) {
+        const sec = Object.assign(document.createElement("section"), { className: "cl-rel" });
+        sec.innerHTML = `<header><span class="ver"></span><span class="ttl"></span><span class="date"></span></header>`;
+        sec.querySelector(".ver").textContent = "v" + rel.version;
+        sec.querySelector(".ttl").textContent = rel.title;
+        sec.querySelector(".date").textContent = new Date(rel.date + "T12:00").toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" });
+        for (const [h, items] of rel.groups) {
+          const ul = document.createElement("ul");
+          for (const t of items) ul.append(Object.assign(document.createElement("li"), { textContent: t }));
+          sec.append(Object.assign(document.createElement("h4"), { textContent: h }), ul);
+        }
+        el.append(sec);
+      }
+      openWindow("Changelog", el, { app: "Changelog", width: Math.min(560, Math.round(innerWidth * 0.92)), height: appHeight(0.85) });
+    }
+
+    // ======================= Suggestions =======================
+    // Anyone can send one. The owner (ADMIN_USERS on the server) also sees what was sent.
+    function openSuggestions() {
+      const el = document.createElement("div");
+      el.className = "app suggest";
+      el.innerHTML = `<h2>💡 Suggestion box</h2>
+        <p>Got an idea for GhettoOS, a game or site to add, or found a bug? Write it here and it goes straight to the owner.</p>
+        <textarea maxlength="2000" placeholder="I think GhettoOS should…" aria-label="Your suggestion"></textarea>
+        <div class="row"><button type="button" class="gbtn primary">Send suggestion</button><span class="note" role="status"></span></div>
+        <div class="received"></div>`;
+      const ta = el.querySelector("textarea"), btn = el.querySelector(".gbtn"), note = el.querySelector(".note"), received = el.querySelector(".received");
+      const say = (t, err) => { note.textContent = t; note.classList.toggle("err", !!err); };
+      const who = () => say(account ? `Sending as ${account}` : "Sending as a guest");
+      who();
+      btn.onclick = async () => {
+        const text = ta.value.trim();
+        if (text.length < 3) return say("Write a little more first.", true);
+        btn.disabled = true;
+        try { await api("/api/suggest", { text }); ta.value = ""; say("Sent! Thanks for the idea 💡"); loadReceived(); }
+        catch (e) { say(e.status === undefined ? "Can't reach GhettoOS right now." : e.message, true); }
+        finally { btn.disabled = false; }
+      };
+      async function loadReceived() {
+        received.textContent = "";
+        if (!account) return;
+        let list;
+        try { ({ suggestions: list } = await api("/api/suggestions")); } catch { return; } // not the owner
+        received.append(Object.assign(document.createElement("h3"), { textContent: `Received (${list.length})` }));
+        if (!list.length) received.append(Object.assign(document.createElement("p"), { textContent: "No suggestions yet." }));
+        for (const s of list) {
+          const item = Object.assign(document.createElement("div"), { className: "sg-item" });
+          item.innerHTML = `<div class="meta"><b></b><span></span><button type="button" class="gbtn danger">Delete</button></div><div class="txt"></div>`;
+          item.querySelector("b").textContent = s.name || "Guest";
+          item.querySelector(".meta span").textContent = new Date(s.created).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+          item.querySelector(".txt").textContent = s.text;
+          item.querySelector("button").onclick = () => api("/api/suggestions/delete", { id: s.id }).then(loadReceived, (e) => say(e.message, true));
+          received.append(item);
+        }
+      }
+      const onAcct = () => { if (!el.isConnected) return onAccountChange.delete(onAcct); who(); loadReceived(); };
+      onAccountChange.add(onAcct);
+      openWindow("Suggestions", el, { app: "Suggestions", width: Math.min(520, Math.round(innerWidth * 0.92)), height: appHeight(0.8), onclose: () => onAccountChange.delete(onAcct) });
+      loadReceived();
+      setTimeout(() => ta.focus(), 50);
+    }
+
+    // ======================= AI Chat (static build) =======================
+    // Without the proxy, duck.ai can't load, so the static build talks to Pollinations'
+    // keyless, CORS-enabled chat API straight from the browser (slow-ish: it's rate limited).
+    // Checked 2026-11: text.pollinations.ai now wants a Turnstile (human check) token from
+    // browsers, and gen.pollinations.ai's keyless tier refuses custom system prompts (401).
+    // Without a key only a few cached prompts work, so real questions need a free Pollinations
+    // key (enter.pollinations.ai/keys). It's kept in this browser only.
+    const AI_ENDPOINTS = ["https://gen.pollinations.ai/v1/chat/completions"];
+    const AI_KEY = "ghettoos-ai-key";
+    const aiKey = () => { try { return localStorage.getItem(AI_KEY) || ""; } catch { return ""; } };
+    async function askAI(messages) {
+      let lastErr;
+      for (const url of AI_ENDPOINTS) {
+        try {
+          const headers = { "content-type": "application/json" };
+          if (aiKey()) headers.authorization = "Bearer " + aiKey();
+          const r = await fetch(url, { method: "POST", headers, body: JSON.stringify({ model: "openai", messages }) });
+          if (r.status === 429) { lastErr = new Error("AI Chat is busy. Wait a few seconds and try again."); continue; }
+          if (r.status === 401 || r.status === 403) {
+            lastErr = Object.assign(new Error(aiKey() ? "That AI Chat key didn't work. Check it and try again." : "AI Chat needs a free key. Get one at enter.pollinations.ai/keys and paste it above."), { needsKey: true });
+            continue;
+          }
+          if (!r.ok) { lastErr = new Error(`AI Chat failed (${r.status}).`); continue; }
+          const text = (await r.json())?.choices?.[0]?.message?.content;
+          if (text) return text.trim();
+          lastErr = new Error("AI Chat sent an empty reply.");
+        } catch { lastErr = new Error("Can't reach AI Chat. Check your connection."); }
+      }
+      throw lastErr;
+    }
+    function openAIChat() {
+      const el = document.createElement("div");
+      el.className = "app chat-app";
+      el.innerHTML = `<div class="chat-top"><b>AI Chat</b><button type="button" class="gbtn" style="margin-left:auto" data-key>Key</button><button type="button" class="gbtn" data-new>New chat</button></div>
+        <form class="chat-top ai-key" hidden><input class="ginput" style="flex:1" type="password" placeholder="Pollinations key (free at enter.pollinations.ai/keys)" aria-label="Pollinations key" autocomplete="off"><button class="gbtn primary">Save</button></form>
+        <div class="chat-log" aria-live="polite"><div class="chat-empty">Ask me anything.</div></div>
+        <div class="chat-note" role="alert"></div>
+        <form class="chat-send"><input maxlength="2000" placeholder="Message AI Chat" aria-label="Message"><button type="submit">Send</button></form>`;
+      const log = el.querySelector(".chat-log"), note = el.querySelector(".chat-note");
+      const form = el.querySelector(".chat-send"), input = form.querySelector("input"), sendBtn = form.querySelector('[type="submit"]');
+      let history = [];
+      const keyForm = el.querySelector(".ai-key"), keyInput = keyForm.querySelector("input");
+      const showKey = (on = keyForm.hidden) => { keyForm.hidden = !on; if (on) { keyInput.value = aiKey(); keyInput.focus(); } };
+      el.querySelector("[data-key]").onclick = () => showKey();
+      keyForm.onsubmit = (e) => {
+        e.preventDefault();
+        try { keyInput.value.trim() ? localStorage.setItem(AI_KEY, keyInput.value.trim()) : localStorage.removeItem(AI_KEY); } catch {}
+        showKey(false);
+        note.textContent = aiKey() ? "Key saved. Send your message again." : "Key removed.";
+        input.focus();
+      };
+      const add = (who, text) => {
+        log.querySelector(".chat-empty")?.remove();
+        const row = msgRow(who, Date.now(), text, false);
+        log.append(row);
+        log.scrollTop = log.scrollHeight;
+        return row;
+      };
+      el.querySelector("[data-new]").onclick = () => {
+        history = [];
+        note.textContent = "";
+        log.innerHTML = `<div class="chat-empty">Ask me anything.</div>`;
+        input.focus();
+      };
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text || sendBtn.disabled) return;
+        input.value = "";
+        note.textContent = "";
+        add("You", text);
+        history.push({ role: "user", content: text });
+        const thinking = add("AI", "Thinking…");
+        sendBtn.disabled = true;
+        try {
+          const reply = await askAI(history.slice(-20));
+          history.push({ role: "assistant", content: reply });
+          thinking.querySelector(".text").textContent = reply;
+        } catch (err) {
+          thinking.remove();
+          history.pop();
+          note.textContent = err.message;
+          if (err.needsKey) showKey(true);
+          input.value ||= text;
+        } finally { sendBtn.disabled = false; input.focus(); log.scrollTop = log.scrollHeight; }
+      };
+      openWindow("AI Chat", el, { app: "AI Chat", width: Math.min(560, Math.round(innerWidth * 0.92)), height: appHeight(0.85) });
+      setTimeout(() => input.focus(), 50);
+    }
+
+    // ======================= Startup =======================
+    useLogo(GHETTO_ICON);
+    addEye($id("lock-pass"));
+    applyCloak();
+    applyAppearance();
+    showUser();
+    tickClock();
+    setInterval(tickClock, 1000);
+    proxyReady.then(syncAdblock, () => {});
+    if (settings.lockOnStart) lockScreen();
+    // Already signed in on this device? (Offline: stay a guest with the last saved settings.)
+    api("/api/auth/me").then(({ name }) => {
+      if (!name) return;
+      setAccount(name);
+      if (!lockEl.hidden) $id("lock-pass").focus();
+      loadAccountPrefs().catch((e) => console.warn("Couldn't load your settings:", e.message));
+    }).catch(() => {});
+  </script>
+</body>
+</html>
